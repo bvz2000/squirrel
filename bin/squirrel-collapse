@@ -1,0 +1,112 @@
+#! /usr/bin/env python2
+
+"""
+License
+--------------------------------------------------------------------------------
+Squirrel is released under version 3 of the GNU General Public License.
+
+squirrel
+Copyright (C) 2019  Bernhard VonZastrow
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+from __future__ import print_function
+
+from __future__ import print_function
+
+import inspect
+import os
+import sys
+
+from bvzlib import options
+from bvzlib import resources
+
+from store import asset
+
+OPTIONS = [
+    "asset_path",
+    "remove_pins",
+    "language",
+]
+
+
+# ------------------------------------------------------------------------------
+def validate_options():
+    """
+    Validates that the options passed are internally consistent,and complete.
+
+    :return: Nothing.
+    """
+
+    if not os.path.exists(opts.asset_path):
+        err = resc.error(100)
+        err.msg = err.msg.format(asset_path=opts.asset_path)
+        print(err.msg)
+        sys.exit(100)
+
+    if not os.path.exists(os.path.join(opts.asset_path, ".asset")):
+        err = resc.error(101)
+        err.msg = err.msg.format(asset_path=opts.asset_path)
+        print(err.msg)
+        sys.exit(101)
+
+
+# ==============================================================================
+if __name__ == "__main__":
+
+    # Extract the language from the sys.argv if it is there
+    language = "english"
+    if "-language" in sys.argv:
+        idx = sys.argv.index("-language")
+        try:
+            language = sys.argv[idx]
+        except IndexError:
+            pass
+
+    module_d = os.path.split(inspect.stack()[0][1])[0]
+    resources_d = os.path.join(module_d, "..", "resources")
+    resc = resources.Resources(resources_d, "bin_squirrel-collapse", language)
+
+    # Create and initialize the options object
+    try:
+        opts_obj = options.Options(OPTIONS, resc, sys.argv[1:], language)
+    except ValueError as error:
+        print(error)
+        sys.exit()
+
+    opts = opts_obj.opts
+    sys.argv = opts_obj.args
+
+    # Validate the inputs
+    validate_options()
+
+    asset_parent_p, name = os.path.split(opts.asset_path)
+    asset_obj = asset.Asset(name=name,
+                            asset_parent_d=asset_parent_p,
+                            language=opts.language,
+                            )
+
+    msg = resc.message("warning")
+    msg = msg.format(asset_name=name)
+    result = None
+    while not result:
+        result = raw_input(msg)
+        if result.upper() in ["N", "Q"]:
+            sys.exit(0)
+        if result.upper() not in ["COLLAPSE"]:
+            msg = resc.message("warning_re_enter")
+            result = None
+
+    asset_obj.collapse()
