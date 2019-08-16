@@ -40,7 +40,6 @@ OPTIONS = [
     "mapping",
     "udim_pattern",
     "seq_pattern",
-    "seq_delimter",
 ]
 
 
@@ -58,19 +57,21 @@ def validate_options():
         print(err.msg)
         sys.exit(100)
 
-    # Source file or directory must exist
-    for item in opts.source:
-        files = list()
+    # All of the source files must exist
+    for item in expanded:
         if not os.path.exists(item):
-            files = filesystem.expand_files(item,
-                                            udim_string=opts.udim_pattern,
-                                            seq_string=opts.seq_pattern,
-                                            seq_delim=opts.seq_delim)
-        if not files:
             err = resc.error(101)
             err.msg = err.msg.format(path=item)
             print(err.msg)
-            sys.exit(101)
+            sys.exit(102)
+
+    # None of the source files may be directories
+    for item in expanded:
+        if os.path.isdir(item):
+            err = resc.error(104)
+            err.msg = err.msg.format(path=item)
+            print(err.msg)
+            sys.exit(104)
 
     # Dest directory must exist
     if not os.path.exists(opts.destination):
@@ -113,21 +114,17 @@ if __name__ == "__main__":
     opts = opts_obj.opts
     sys.argv = opts_obj.args
 
+    # Expand any frame specs to actual files
+    expanded = list()
+    for source in opts.source:
+        source = os.path.abspath(source)
+        expanded.extend(filesystem.expand_frame_spec(source))
+
     # Validate the inputs
     validate_options()
 
-    # Gather each of the sources
-    for source in opts.source:
-
-        if os.path.isdir(source):
-            sources = [f for f in os.listdir(source) if not os.path.isdir(f)]
-            for i in range(len(sources)):
-                sources[i] = os.path.join(source, sources[i])
-        else:
-            sources = [source]
-
-        gather_obj = gather.Gather(files=sources,
-                                   dest=opts.destination,
-                                   mapping=None)
-
-        gather_obj.gather_files()
+    # Gather the sources
+    gather_obj = gather.Gather(files=opts.source,
+                               dest=opts.destination,
+                               mapping=None)
+    gather_obj.gather_files()
