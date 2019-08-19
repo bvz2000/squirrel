@@ -28,7 +28,6 @@ import inspect
 import os
 import sys
 
-from bvzlib import filesystem
 from bvzlib import options
 from bvzlib import resources
 
@@ -38,8 +37,10 @@ OPTIONS = [
     "source",
     "destination",
     "mapping",
-    "udim_pattern",
-    "seq_pattern",
+    "udim_identifier",
+    "loose_udim_format",
+    "padding",
+    "match_hash_length",
 ]
 
 
@@ -57,16 +58,8 @@ def validate_options():
         print(err.msg)
         sys.exit(100)
 
-    # All of the source files must exist
-    for item in expanded:
-        if not os.path.exists(item):
-            err = resc.error(101)
-            err.msg = err.msg.format(path=item)
-            print(err.msg)
-            sys.exit(102)
-
     # None of the source files may be directories
-    for item in expanded:
+    for item in opts.source:
         if os.path.isdir(item):
             err = resc.error(104)
             err.msg = err.msg.format(path=item)
@@ -114,11 +107,16 @@ if __name__ == "__main__":
     opts = opts_obj.opts
     sys.argv = opts_obj.args
 
-    # Expand any frame specs to actual files
-    expanded = list()
-    for source in opts.source:
-        source = os.path.abspath(source)
-        expanded.extend(filesystem.expand_frame_spec(source))
+    if opts.padding == "":
+        opts.padding = None
+
+    if opts.mapping:
+        mapping = dict()
+        for item in opts.mapping:
+            key, value = item.split("=")
+            mapping[key.strip()] = value.strip()
+    else:
+        mapping = None
 
     # Validate the inputs
     validate_options()
@@ -126,5 +124,9 @@ if __name__ == "__main__":
     # Gather the sources
     gather_obj = gather.Gather(files=opts.source,
                                dest=opts.destination,
-                               mapping=None)
-    gather_obj.gather_files()
+                               mapping=mapping,
+                               padding=opts.padding,
+                               udim_identifier=opts.udim_identifier,
+                               strict_udim_format=not(opts.loose_udim_format),
+                               match_hash_length=opts.match_hash_length)
+    gather_obj.gather_files(verbose=True)

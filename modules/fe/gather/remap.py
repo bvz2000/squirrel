@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import os.path
-import re
 
 from bvzlib import filesystem
 
@@ -61,8 +60,10 @@ class Remap(object):
                  dest,
                  already_remapped,
                  mapping_def=None,
-                 udim_strings=None,
-                 seq_num_strings=None):
+                 padding=None,
+                 udim_identifier=None,
+                 strict_udim_format=True,
+                 match_hash_length=False):
         """
         Initializes the object. The source path is the actual string that
         defined the file path in the original Clarisse project.
@@ -74,6 +75,8 @@ class Remap(object):
         names ending in '_d' = a directory name, no file name
 
         :param source_p: The path to the external file that is to be remapped.
+               It may be a real file or a sequence, UDIM, or contain a sequence
+               identifier like (# or %0d).
         :param dest: The root path where the files will be gathered to when
                gathered.
         :param already_remapped: A list of the remapped paths of files
@@ -90,13 +93,25 @@ class Remap(object):
 
                If None, loads the GATHER_MAPPING defined at the top of this
                module. Defaults to None.
-        :param udim_strings: The pattern to use for identifying the UDIM place-
-               holder in a file name. For example, Clarisse uses: "<UDIM>". This
-               may also accept a list in case there is more than one pattern to
-               search for. Defaults to "<UDIM>".
-        :param seq_num_strings: The symbol used to indicate a sequence number
-               placeholder. For example, Clarisse uses "#". This may also accept
-               a list in case there is more than one placeholder. Defaults to #.
+    :param padding: Any padding to use when expanding frame specs. If None, then
+           the padding will be determined from the longest number in the
+           sequence. Defaults to None.
+    :param udim_identifier: The string that is used as the UDIM identifier. If
+           None, then the pattern "<UDIM>" will be used. Defaults to None.
+    :param strict_udim_format: If True, then UDIM's will have to conform to the
+           #### format, where the starting value is 1001. If False, then the
+           UDIM must start with four digits, but can then contain any extra
+           characters. Substance Painter allows this for example. Note, setting
+           this to False may lead to somewhat erroneous identification of UDIM's
+           in files, so - unless absolutely needed - this should be se to True.
+           Defaults to True.
+    :param match_hash_length: If True, then the output regex will be designed
+           such that the number of digits has to match the number of hashes.
+           If False, then a single hash would match any number of digits.
+           For example: if True, then filename.#.exr would only match files with
+           a single digit sequence number. If False, then any sequence number,
+           no matter how long, would match. If the sequence identifier is in the
+           printf format, this argument is ignored.
 
         :return: Nothing.
         """
@@ -104,20 +119,6 @@ class Remap(object):
         self.source_p = source_p
         self.dest = dest
         self._already_remapped = already_remapped
-
-        if udim_strings is None:
-            udim_strings = ["<UDIM>"]
-        if not type(udim_strings) is list:
-            self.udim_strings = [udim_strings]
-        else:
-            self.udim_strings = udim_strings
-
-        if seq_num_strings is None:
-            seq_num_strings = ["#"]
-        if not type(seq_num_strings) is list:
-            self.seq_num_strings = [seq_num_strings]
-        else:
-            self.seq_num_strings = seq_num_strings
 
         self.expanded_mapping = dict()
         self._target_p = None
@@ -127,17 +128,23 @@ class Remap(object):
         else:
             self.mapping_def = mapping_def
 
+        self.padding = padding
+        self.udim_identifier = udim_identifier
+        self.strict_udim_format = strict_udim_format
+        self.match_hash_length = match_hash_length
+
         self.do_remapping()
 
     # --------------------------------------------------------------------------
     @property
     def already_remapped(self):
         """
-        :return: The list of target files that were calculated.
+        :return: An inverse dictionary of remapped files where the key is the
+                 remapped path, and the value is the source path.
         """
-        output = list()
+        output = dict()
         for actual_source_p in self.expanded_mapping:
-            output.append(self.expanded_mapping[actual_source_p])
+            output[self.expanded_mapping[actual_source_p]] = actual_source_p
         return output
 
     # --------------------------------------------------------------------------
@@ -163,46 +170,6 @@ class Remap(object):
         """
 
         return self.expanded_mapping
-
-    # --------------------------------------------------------------------------
-    def expand_files(self):
-        """
-        Expands the source path to multiple paths if the source path contains
-        <UDIM> or .####. (any number of pound signs). These expanded paths are
-        stored as the keys of the expanded_mapping dictionary. If there are no
-        files to expand to (i.e. the source_p does not contain either <UDIM> or
-        .# (any number of # symbols) then the expanded_mapping dictionary will
-        contain a single item that matches the source_p.
-
-        :return: Nothing.
-        """
-
-        udim_patterns = list()
-        for item in self.udim_strings:
-            udim_patterns.append(r"(.*)(" + item + ")(.*)")
-
-        seq_num_patterns = list()
-        for item in self.seq_num_strings:
-            seq_num_patterns.append(r"^([^.]*)(\." + item + "+)(\..*)?$")
-
-        expanded = list()
-        matched = False
-
-        for udim_pattern in udim_patterns:
-            if re.match(udim_pattern, self.source_p):
-                expanded.extend(filesystem.expand_udims(self.source_p))
-                matched = True
-
-        for seq_num_pattern in seq_num_patterns:
-            if re.match(seq_num_pattern, self.source_p):
-                expanded.extend(filesystem.expand_sequences(self.source_p))
-                matched = True
-
-        if not matched:
-            expanded = [self.source_p]
-
-        for path in expanded:
-            self.expanded_mapping[path] = None
 
     # --------------------------------------------------------------------------
     def remap_file(self, path):
@@ -236,13 +203,17 @@ class Remap(object):
         :return: Nothing.
         """
 
-        self.expand_files()
+        expanded = filesystem.expand_files(self.source_p,
+                                           self.padding,
+                                           self.udim_identifier,
+                                           self.strict_udim_format,
+                                           self.match_hash_length)
 
         # Identify the increment number (if any is needed) before doing the
-        # remap (check all files first to make sure any sequences are not
-        # remapped to different increment numbers.
+        # remap (check all files first to make sure any sequences are kept
+        # together and not remapped to different increment numbers.
         max_incr = 0
-        for file_to_remap in self.expanded_mapping:
+        for file_to_remap in expanded:
 
             base, ext = os.path.splitext(file_to_remap)
             copy_str = ""
@@ -250,6 +221,16 @@ class Remap(object):
 
             remap = self.remap_file(base + copy_str + ext)
             while os.path.exists(remap) or remap in self._already_remapped:
+
+                if os.path.exists(remap):
+                    if filesystem.files_are_identical(file_to_remap, remap):
+                        break
+
+                if remap in self._already_remapped:
+                    original = self._already_remapped[remap]
+                    if filesystem.files_are_identical(file_to_remap, original):
+                        break
+
                 incr += 1
                 max_incr = max(max_incr, incr)
                 copy_str = "_copy" + str(incr)
@@ -263,7 +244,7 @@ class Remap(object):
             copy_str = ""
 
         # Now that we have the increment string (if any) do the actual remapping
-        for file_to_remap in self.expanded_mapping:
+        for file_to_remap in expanded:
             base, ext = os.path.splitext(file_to_remap)
             remap = self.remap_file(base + copy_str + ext)
             self.expanded_mapping[file_to_remap] = remap

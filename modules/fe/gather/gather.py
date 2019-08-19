@@ -30,15 +30,30 @@ import remap
 class Gather(object):
     """
     A class responsible for gathering files from anywhere on disk to a single
-    location, sorted by file type.
+    location, sorted by file type. Note: This process requires that the files
+    passed still contain any UDIM identifiers (<UDIM> for example) and sequence
+    identifiers (.### or %03d for example) and sequence specs (1-10x2 for
+    example) that they may have had in the original, calling DCC app. This is
+    needed so that if collisions between files are found, an entire sequence
+    of files (sequence as defined by being grouped sequence files or grouped
+    UDIM files) are rev'ed up together. If these sequences are expanded BEFORE
+    this object has a chance to work on them, then if there are any collisions
+    only some of the files may be rev'ed up, and as such the sequence will
+    break.
     """
 
     def __init__(self,
                  files,
                  dest,
-                 mapping=None):
+                 mapping=None,
+                 padding=None,
+                 udim_identifier=None,
+                 strict_udim_format=True,
+                 match_hash_length=False):
         """
-        :param files: A list of file paths to be gathered.
+        :param files: A list of file paths to be gathered. Note that these can
+               also be in the format of a sequence, contain sequence identifiers
+               (# symbols or %0d), and/or UDIM identifiers.
         :param dest: The destination path root.
         :param mapping: A dict where the key is the file type (file extension)
                and the value is the relative path to where files of this type
@@ -49,11 +64,37 @@ class Gather(object):
                abc : geo
 
                If None, uses a built-in, default map. Defaults to None.
+
+        :param padding: Any padding to use when expanding frame specs. If None,
+               then the padding will be determined from the longest number in
+               the sequence. Defaults to None.
+        :param udim_identifier: The string that is used as the UDIM identifier.
+               If None, then the pattern "<UDIM>" will be used. Defaults to
+               None.
+        :param strict_udim_format: If True, then UDIM's will have to conform to
+               the #### format, where the starting value is 1001. If False, then
+               the UDIM must start with four digits, but can then contain any
+               extra characters. Substance Painter allows this for example.
+               Note, setting this to False may lead to somewhat erroneous
+               identification of UDIM's in files, so - unless absolutely
+               needed - this should be se to True. Defaults to True.
+        :param match_hash_length: If True, then the output regex will be
+               designed such that the number of digits has to match the number
+               of hashes. If False, then a single hash would match any number of
+               digits. For example: if True, then filename.#.exr would only
+               match files with a single digit sequence number. If False, then
+               any sequence number, no matter how long, would match. If the
+               sequence identifier is in the printf format, this argument is
+               ignored.
         """
 
         self.files = files
         self.dest = dest
         self.mapping = mapping
+        self.padding = padding
+        self.udim_identifier = udim_identifier
+        self.strict_udim_format = strict_udim_format
+        self.match_hash_length = match_hash_length
 
         self.remap_objs = list()
         self.remapped = dict()
@@ -67,29 +108,35 @@ class Gather(object):
         gathered to. Automatically compensates for internal collisions (where
         two files would be copied to the same destination file) and external
         collisions (where a copied file would overwrite an already existing file
-        on disk). Also handles expanding files with the string <UDIM> and
-        sequences containing .#### (with any number of # symbols). Does not
-        actually copy any files.
+        on disk). Also handles expanding files with sequence specs (1-10x2 for
+        example), UDIM identifiers (<UDIM> for example), and sequences
+        containing .#### (with any number of # symbols) or the printf format of
+        %0d. Does not actually copy any files.
 
         :return: Nothing.
         """
 
-        already_remapped = list()
+        already_remapped = dict()
         for file_p in self.files:
 
             remap_obj = remap.Remap(file_p,
                                     self.dest,
                                     already_remapped,
-                                    self.mapping)
-            already_remapped.extend(remap_obj.already_remapped)
+                                    self.mapping,
+                                    self.padding,
+                                    self.udim_identifier,
+                                    self.strict_udim_format,
+                                    self.match_hash_length)
+            already_remapped.update(remap_obj.already_remapped)
             self.remap_objs.append(remap_obj)
 
     # --------------------------------------------------------------------------
     def copy_files(self):
         """
         Steps through the remap objects list and copies files from the source to
-        the destination. Does no checking to see if it might overwrite an
-        existing file.
+        the destination. Skips any files that might be overwritten (by this
+        point, those are to be skipped by default because they are known to be
+        identical files).
 
         :return: Nothing.
         """
@@ -104,18 +151,15 @@ class Gather(object):
 
                 copy_source_p = actual_source_p
                 copy_target_p = remap_obj.mapping[actual_source_p]
-                try:
-                    print "Copying:", copy_source_p
-                    print "     to:", copy_target_p
+
+                if not os.path.exists(copy_target_p):
                     shutil.copyfile(copy_source_p, copy_target_p)
-                except IOError:
-                    raise
 
     # --------------------------------------------------------------------------
     def gather_files(self):
         """
         Copies the files passed during object creation to their new location.
-        Returns a dict where the key is the file that was gathered, and the
+        Builds a dict where the key is the file that was gathered, and the
         value is a tuple where the first item is the absolute path to where the
         file was copied, and the second item is the relative path (relative to
         "dest") where the file was copied. Keeps a dictionary where the key is
@@ -126,6 +170,8 @@ class Gather(object):
         include this format (i.e. will also have the text "<UDIM>" or ".####" in
         it. That said, the actual files copied are the actual files that this
         representation refers to.
+
+        :return: Nothing.
         """
 
         self.remap_files()
