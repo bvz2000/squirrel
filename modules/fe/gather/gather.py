@@ -130,6 +130,9 @@ class Gather(object):
             already_remapped.update(remap_obj.already_remapped)
             self.remap_objs.append(remap_obj)
 
+        for remap_obj in self.remap_objs:
+            self.remapped[remap_obj.source_p] = remap_obj.target_p
+
     # --------------------------------------------------------------------------
     def copy_files(self):
         """
@@ -156,20 +159,40 @@ class Gather(object):
                     shutil.copyfile(copy_source_p, copy_target_p)
 
     # --------------------------------------------------------------------------
-    def gather_files(self):
+    def cull_file(self,
+                  file_p):
         """
-        Copies the files passed during object creation to their new location.
-        Builds a dict where the key is the file that was gathered, and the
-        value is a tuple where the first item is the absolute path to where the
-        file was copied, and the second item is the relative path (relative to
-        "dest") where the file was copied. Keeps a dictionary where the key is
-        the original file, and the value is the absolute path of where the files
-        have been gathered to. Note: if the original path is a sequence - i.e.
-        contains either <UDIM> or .### (with any number of # symbols) - the
-        "absolute path of where the files have been gathered to" will also
-        include this format (i.e. will also have the text "<UDIM>" or ".####" in
-        it. That said, the actual files copied are the actual files that this
-        representation refers to.
+        Given the path to a source file, removes that file from the list of
+        remapped files, thereby preventing it from being gathered when the
+        copy_files method is invoked. This cull_file method should be invoked
+        between calling remap_files and copy_files.
+
+        :param file_p: The full path to the source file that should be removed
+               from the list of remapped files.
+
+        :return: Nothing.
+        """
+
+        output = list()
+        for remap_obj in self.remap_objs:
+            if remap_obj.source_p != file_p:
+                output.append(remap_obj)
+        self.remap_objs = output
+
+        keys = self.remapped.keys()
+        for key in keys:
+            del self.remapped[key]
+
+    # --------------------------------------------------------------------------
+    def gather_files(self):
+
+        """
+        Remaps the files (those that were passed to this object when it was
+        created) and then copies those files to their remapped location. If
+        some of the remapped files need to be culled (because they may point to
+        already published assets, for example, then do not call this function.
+        Call remap_files and copy_files separately. This is just a convenience
+        function in case no culling is required.
 
         :return: Nothing.
         """
@@ -177,5 +200,5 @@ class Gather(object):
         self.remap_files()
         self.copy_files()
 
-        for remap_obj in self.remap_objs:
-            self.remapped[remap_obj.source_p] = remap_obj.target_p
+        #for remap_obj in self.remap_objs:
+        #    self.remapped[remap_obj.source_p] = remap_obj.target_p
