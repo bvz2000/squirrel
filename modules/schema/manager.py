@@ -481,8 +481,9 @@ class RepoManager(object):
         else:
             repos = [repo_name]
 
-        for repo in repos:
-            if repo.path_is_within_repo(file_p):
+        for repo_name in repos:
+            repo_obj = self.repos[repo_name]
+            if repo_obj.path_is_within_repo(file_p):
                 return True
 
         return False
