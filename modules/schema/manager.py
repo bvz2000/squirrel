@@ -7,6 +7,7 @@ from bvzlib import filesystem
 from bvzlib import resources
 
 from shared import envvars
+from shared.squirrelerror import SquirrelError
 
 from interface import storeinterface
 
@@ -110,10 +111,10 @@ class RepoManager(object):
         for repo_name, repo_path in repos:
             try:
                 self.load_repo(repo_p=repo_path)
-            except ValueError as e:
+            except SquirrelError as e:
                 if not silence:
                     if fail:
-                        raise ValueError(str(e))
+                        raise SquirrelError(str(e), e.code)
                     if warn:
                         e = "Warning: " + str(e) + " Cannot load this repo."
                         print(str(e))
@@ -291,12 +292,12 @@ class RepoManager(object):
         if not self.config_obj.has_section("repos"):
             err = self.resc.error(100)
             err.msg = err.msg.format()
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         if not self.config_obj.has_option("repos", repo_n):
             err = self.resc.error(101)
             err.msg = err.msg.format(repo_name=repo_n)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         # The target repo must exist on disk as a real repo (if it does not, the
         # following will raise an error)
@@ -346,12 +347,12 @@ class RepoManager(object):
         if not os.path.exists(path_d):
             err = self.resc.error(400)
             err.msg = err.msg.format(path=path_d)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         if not os.path.isdir(path_d):
             err = self.resc.error(401)
             err.msg = err.msg.format(dir=path_d)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         if name:
             if name in self.repos.keys():
@@ -361,7 +362,7 @@ class RepoManager(object):
                     err = self.resc.error(601)
                     err.msg = err.msg.format(repo=name,
                                              path=self.repos[name].repo_root_d)
-                    raise ValueError(err.msg)
+                    raise SquirrelError(err.msg, err.code)
 
         # Create a config parser and save it in the directory, removing any
         # existing files if needed
@@ -376,7 +377,7 @@ class RepoManager(object):
             if ancestor_d:
                 err = self.resc.error(602)
                 err.msg = err.msg.format(path=path_d, repo=ancestor_d)
-                raise ValueError(err.msg)
+                raise SquirrelError(err.msg, err.code)
 
             bless_obj.add_section("settings")
             bless_obj.set("settings", "name", name)
@@ -400,7 +401,7 @@ class RepoManager(object):
                                                      1):
                 err = self.resc.error(603)
                 err.msg = err.msg.format(path=path_d)
-                raise ValueError(err.msg)
+                raise SquirrelError(err.msg, err.code)
 
             semaphore_p = os.path.join(path_d, ".repo")
             if os.path.exists(semaphore_p):
@@ -427,12 +428,12 @@ class RepoManager(object):
         if not os.path.exists(root_d):
             err = self.resc.error(400)
             err.msg = err.msg.format(path=root_d)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         if not os.path.isdir(root_d):
             err = self.resc.error(401)
             err.msg = err.msg.format(dir=root_d)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         root = True
         for dir_d, dirs_n, files_n in os.walk(root_d):
@@ -454,14 +455,14 @@ class RepoManager(object):
                 dirs_n.remove(del_n)
 
     # --------------------------------------------------------------------------
-    def file_is_within_repo(self, file_p, repo_name, check_all_repos):
+    def file_is_within_repo(self, file_p, repo_names, check_all_repos):
         """
         Given the path to a file, check either the given repo or all repos (if
         check_all_repos is True) to see if that file is within the repo.
 
         :param file_p: The path to the file being tested
-        :param repo_name: The name of the repo to check. This value is ignored
-               if check_all_repos is True.
+        :param repo_names: A list of the names of the repos to check. This value
+               is ignored if check_all_repos is True.
         :param check_all_repos: If True, then every repo will be checked to see
                if the file is within one of them.
 
@@ -469,19 +470,19 @@ class RepoManager(object):
         """
 
         if not check_all_repos:
-            assert repo_name is not None
-
-        if repo_name and not self.repo_name_is_valid(repo_name):
-            err = self.resc.error(102)
-            err.msg = err.msg.format()
-            raise ValueError(err.msg)
+            assert repo_names is not None
+            assert type(repo_names) is list
 
         if check_all_repos:
-            repos = self.repos.keys()
+            repo_names = self.repos.keys()
         else:
-            repos = [repo_name]
+            for repo_name in repo_names:
+                if repo_names and not self.repo_name_is_valid(repo_name):
+                    err = self.resc.error(102)
+                    err.msg = err.msg.format(repo_name=repo_name)
+                    raise SquirrelError(err.msg, err.code)
 
-        for repo_name in repos:
+        for repo_name in repo_names:
             repo_obj = self.repos[repo_name]
             if repo_obj.path_is_within_repo(file_p):
                 return True

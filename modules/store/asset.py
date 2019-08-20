@@ -31,6 +31,7 @@ from bvzlib import filesystem
 from bvzlib import config
 
 from shared import envvars
+from shared.squirrelerror import SquirrelError
 
 import meta
 import pin
@@ -265,7 +266,7 @@ class Asset(object):
         
         if highest > 9999:
             err = self.resc.error(103)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
         
         return "v" + str(highest).rjust(4, "0")
 
@@ -345,7 +346,7 @@ class Asset(object):
                 os.unlink(top_metadata_d)
             else:
                 err = self.resc.error(104)
-                raise ValueError(err.msg)
+                raise SquirrelError(err.msg, err.code)
         os.symlink("./." + self.curr_ver_n, top_metadata_d)
 
     # --------------------------------------------------------------------------
@@ -397,7 +398,7 @@ class Asset(object):
         err = self.resc.error(105)
         err.msg = err.msg.format(asset_name=os.path.split(self.asset_d)[1],
                                  num_attempts=num_attempts)
-        raise ValueError(err.msg)
+        raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def merge_dir(self):

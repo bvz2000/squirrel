@@ -5,6 +5,7 @@ import os
 from bvzlib import filesystem
 from bvzlib import resources
 
+from shared.squirrelerror import SquirrelError
 
 # ==============================================================================
 class Repo(object):
@@ -117,13 +118,13 @@ class Repo(object):
         if not os.path.exists(path):
             err = self.resc.error(400)
             err.msg = err.msg.format(path=path)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         # Make sure this is a repo root
         if not os.path.exists(os.path.join(path, ".repo_root")):
             err = self.resc.error(200)
             err.msg = err.msg.format(root_path=path)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         self.repo_root_d = path
 
@@ -135,7 +136,7 @@ class Repo(object):
         else:
             err = self.resc.error(106)
             err.msg = err.msg.format(path=path)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     @staticmethod
@@ -203,7 +204,7 @@ class Repo(object):
         if not self.path_is_within_repo(path_p):
             err = self.resc.error(4)
             err.msg = err.msg.format(path=path_p)
-            raise ValueError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         # Step backwards through the path to find the first instance structure
         # dir (this would be a leaf dir of the repo).
@@ -408,7 +409,7 @@ class Repo(object):
         if not self.token_is_valid(token):
             err = self.resc.error(700)
             err.msg = err.msg.format(token=token, repo=self.name)
-            raise ValueError(err.msg, err.code)
+            raise SquirrelError(err.msg, err.code)
 
         # Because the token might not be a leaf node, we have to consider
         # sub-directories of this token as well.

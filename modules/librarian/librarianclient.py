@@ -28,7 +28,9 @@ from bvzlib import resources
 
 from interface import schemainterface
 from interface import storeinterface
+
 from shared import envvars
+from shared.squirrelerror import SquirrelError
 
 
 # ==============================================================================
@@ -79,7 +81,7 @@ class LibrarianClient(object):
         if self.local_mode:
             return schemainterface.repo_name_is_valid(repo_name)
         else:
-            raise ValueError("Remote operation not yet implemented.")
+            raise SquirrelError("Remote operation not yet implemented.", 1)
 
     # --------------------------------------------------------------------------
     def get_default_repo(self):
@@ -92,19 +94,19 @@ class LibrarianClient(object):
         if self.local_mode:
             return schemainterface.get_default_repo()
         else:
-            raise ValueError("Remote operation not yet implemented.")
+            raise SquirrelError("Remote operation not yet implemented.", 1)
 
     # --------------------------------------------------------------------------
     def file_is_within_repo(self,
                             file_p,
-                            repo_name=None,
+                            repo_names=None,
                             check_all_repos=True):
         """
         Returns whether or not a particular file is within a repo.
 
         :param file_p: The path to the file we are testing to see whether it is
                within a repo.
-        :param repo_name: The name of the repo we are checking to see whether
+        :param repo_names: The name of the repo we are checking to see whether
                the file is published or not. May be set to None if
                check_all_repos is set to True. Defaults to None
         :param check_all_repos: If True, then all repos will be tested to see if
@@ -117,10 +119,10 @@ class LibrarianClient(object):
 
         if self.local_mode:
             return schemainterface.file_is_within_repo(file_p,
-                                                       repo_name,
+                                                       repo_names,
                                                        check_all_repos)
         else:
-            raise ValueError("Remote operation not yet implemented.")
+            raise SquirrelError("Remote operation not yet implemented.", 1)
 
     # --------------------------------------------------------------------------
     def file_is_within_asset(self,
@@ -138,7 +140,7 @@ class LibrarianClient(object):
         if self.local_mode:
             return storeinterface.file_is_within_asset(file_p)
         else:
-            raise ValueError("Remote operation not yet implemented.")
+            raise SquirrelError("Remote operation not yet implemented.", 1)
 
     # --------------------------------------------------------------------------
     def token_is_valid(self,
@@ -152,4 +154,4 @@ class LibrarianClient(object):
         if self.local_mode:
             return schemainterface.token_is_valid(token_path)
         else:
-            raise ValueError("Remote operation not yet implemented.")
+            raise SquirrelError("Remote operation not yet implemented.", 1)

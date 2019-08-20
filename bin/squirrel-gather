@@ -33,6 +33,8 @@ from bvzlib import resources
 
 from fe.gather import gather
 from librarian import librarianclient
+from shared.squirrelerror import SquirrelError
+
 
 OPTIONS = [
     "source",
@@ -124,47 +126,53 @@ if __name__ == "__main__":
     # Validate the inputs
     validate_options()
 
-    # Gather the sources
-    gather_obj = gather.Gather(files=opts.source,
-                               dest=opts.destination,
-                               mapping=mapping,
-                               padding=opts.padding,
-                               udim_identifier=opts.udim_identifier,
-                               strict_udim_format=not(opts.loose_udim_format),
-                               match_hash_length=opts.match_hash_length)
+    try:
 
-    gather_obj.remap_files()
+        # Gather the sources
+        gather_obj = gather.Gather(files=opts.source,
+                                   dest=opts.destination,
+                                   mapping=mapping,
+                                   padding=opts.padding,
+                                   udim_identifier=opts.udim_identifier,
+                                   strict_udim_format=not opts.loose_udim_format,
+                                   match_hash_length=opts.match_hash_length)
 
-    if opts.skip_published:
+        gather_obj.remap_files()
 
-        if not opts.repo:
-            repo_name = None
-            check_all_repos = True
-        else:
-            # TODO: Make it work with multiple repos
-            repo_name = opts.repo[0]
-            check_all_repos = False
+        if opts.skip_published:
 
-        librarian = librarianclient.LibrarianClient()
+            if not opts.repo:
+                repo_names = None
+                check_all_repos = True
+            else:
+                repo_names = opts.repo
+                check_all_repos = False
 
-        files_to_cull = list()
-        for source_p in gather_obj.remapped:
-            if librarian.file_is_within_repo(source_p,
-                                             repo_name,
-                                             check_all_repos):
-                files_to_cull.append(source_p)
+            librarian = librarianclient.LibrarianClient()
 
-        for file_to_cull in files_to_cull:
-            gather_obj.cull_file(file_to_cull)
+            files_to_cull = list()
+            for source_p in gather_obj.remapped:
+                if librarian.file_is_within_repo(source_p,
+                                                 repo_names,
+                                                 check_all_repos):
+                    files_to_cull.append(source_p)
 
-    if len(gather_obj.remapped) > 0:
-        msg = resc.message("copy_header")
-        print(msg)
-        for source_p in gather_obj.remapped:
-            msg = resc.message("copy")
-            msg = msg.format(source=source_p, dest=gather_obj.remapped[source_p])
+            for file_to_cull in files_to_cull:
+                gather_obj.cull_file(file_to_cull)
+
+        if len(gather_obj.remapped) > 0:
+            msg = resc.message("copy_header")
             print(msg)
-        gather_obj.copy_files()
-    else:
-        msg = resc.message("nothing_to_copy")
-        print(msg)
+            for source_p in gather_obj.remapped:
+                msg = resc.message("copy")
+                msg = msg.format(source=source_p,
+                                 dest=gather_obj.remapped[source_p])
+                print(msg)
+            gather_obj.copy_files()
+        else:
+            msg = resc.message("nothing_to_copy")
+            print(msg)
+
+    except SquirrelError as e:
+        print(e)
+        sys.exit(e.errno)

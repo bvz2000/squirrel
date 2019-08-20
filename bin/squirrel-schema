@@ -34,6 +34,9 @@ from bvzlib import resources
 
 from schema import manager
 
+from shared.squirrelerror import SquirrelError
+
+
 OPTIONS = [
     "list_repos",
     "remove_broken_repos",
@@ -133,7 +136,7 @@ if __name__ == "__main__":
     try:
         opts_obj = options.Options(OPTIONS, resc, sys.argv[1:], language)
     except ValueError as error:
-        print(error)
+        print(str(error))
         sys.exit()
 
     opts = opts_obj.opts
@@ -184,9 +187,9 @@ if __name__ == "__main__":
     if opts.set_default_repository:
         try:
             repo_manager_obj.set_default_repo(opts.set_default_repository)
-        except ValueError as err:
+        except SquirrelError as err:
             print(str(err))
-            sys.exit()
+            sys.exit(err.code)
 
     if opts.remove_repository:
         repo_manager_obj.remove_repo_from_config(opts.remove_repository)
@@ -195,27 +198,30 @@ if __name__ == "__main__":
         opts.add_repository = os.path.abspath(opts.add_repository)
         try:
             repo_manager_obj.add_repo_to_config(opts.add_repository)
-        except ValueError as err:
+        except SquirrelError as err:
             print(str(err))
-            sys.exit()
+            sys.exit(err.code)
 
     if opts.bless_tree:
         try:
             repo_manager_obj = manager.RepoManager(language)
             repo_manager_obj.bless_tree(opts.bless_tree, opts.name)
-        except ValueError as e:
-            print(str(e))
+        except SquirrelError as err:
+            print(str(err))
+            sys.exit(err.code)
 
     if opts.bless_root:
         try:
             repo_manager_obj = manager.RepoManager(language)
             repo_manager_obj.bless_dir(opts.bless_root, True, opts.name)
-        except ValueError as e:
-            print(str(e))
+        except SquirrelError as err:
+            print(str(err))
+            sys.exit(err.code)
 
     if opts.bless_dir:
         try:
             repo_manager_obj = manager.RepoManager(language)
             repo_manager_obj.bless_dir(opts.bless_dir)
-        except ValueError as e:
-            print(str(e))
+        except SquirrelError as err:
+            print(str(err))
+            sys.exit(err.code)

@@ -25,6 +25,7 @@ import os
 
 from bvzlib import resources
 
+from shared.squirrelerror import SquirrelError
 
 class Pin(object):
     """
@@ -61,7 +62,7 @@ class Pin(object):
             if not os.path.islink(self.pin_p):
                 err = self.resc.error(108)
                 err.msg = err.msg.format(pin=self.pin_p)
-                raise ValueError(err.msg)
+                raise SquirrelError(err.msg, err.code)
 
             os.unlink(self.pin_p)
 

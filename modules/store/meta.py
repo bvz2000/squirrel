@@ -29,6 +29,8 @@ from bvzlib import filesystem
 from bvzlib import resources
 from bvzlib import general
 
+from shared.squirrelerror import SquirrelError
+
 
 class Metadata(object):
     """
@@ -163,7 +165,7 @@ class Metadata(object):
         thumbnails will be stored (but any previously stored will be carried
         forward from the previous version as symlinks).
 
-        Raises a ValueError if the thumbnails do not validate.
+        Raises a SquirrelError if the thumbnails do not validate.
 
         :return: Nothing.
         """
@@ -181,7 +183,7 @@ class Metadata(object):
                 err = self.resc.error(106)
                 err.msg = err.msg.format(thumbnail_file=thumbnail_n,
                                          basename=self.asset_n)
-                raise ValueError(err.msg)
+                raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def get_metadata_obj_from_ver(self, version):
@@ -531,7 +533,7 @@ class Metadata(object):
         err = self.resc.error(109)
         err.msg = err.msg.format(frame=str(frame),
                                  thumbnail_file=self.asset_n + "." + str(frame))
-        raise ValueError(err.msg)
+        raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def carry_forward_thumbnails(self):
@@ -563,7 +565,7 @@ class Metadata(object):
             else:
                 err = self.resc.error(107)
                 err.msg = err.msg.format(thumbnail_file=prev_thumb_n)
-                raise ValueError(err.msg)
+                raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def delete_thumbnails(self, version):
