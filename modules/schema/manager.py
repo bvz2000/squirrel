@@ -1,6 +1,7 @@
 import ConfigParser
 import inspect
 import os
+import tempfile
 
 from bvzlib import config
 from bvzlib import filesystem
@@ -488,3 +489,27 @@ class RepoManager(object):
                 return True
 
         return False
+
+    # --------------------------------------------------------------------------
+    def get_gather_loc(self):
+        """
+        Returns the path where files should be gathered to.
+
+        :return: A path where files should be gathered to.
+        """
+
+        try:
+            gather_loc = envvars.SQUIRREL_DEFAULT_GATHER_LOC
+            return gather_loc
+        except KeyError:
+            pass
+
+        try:
+            gather_loc = self.config_obj.get("settings", "default_gather_loc")
+            return gather_loc
+        except (ConfigParser.NoSectionError,
+                ConfigParser.NoOptionError,
+                ValueError):
+            pass
+
+        return tempfile.gettempdir()
