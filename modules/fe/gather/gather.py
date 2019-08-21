@@ -181,7 +181,8 @@ class Gather(object):
 
         keys = self.remapped.keys()
         for key in keys:
-            del self.remapped[key]
+            if key == file_p:
+                del self.remapped[key]
 
     # --------------------------------------------------------------------------
     def gather_files(self):
