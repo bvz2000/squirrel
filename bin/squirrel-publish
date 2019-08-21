@@ -33,6 +33,8 @@ from bvzlib import filesystem
 from bvzlib import options
 from bvzlib import resources
 
+from librarian import librarianclient
+from shared.squirrelerror import SquirrelError
 from store import asset
 
 OPTIONS = [
@@ -145,8 +147,8 @@ if __name__ == "__main__":
     sys.argv = opts_obj.args
 
     opts.source = opts.source.rstrip("/")
-    if opts.name == "":
-        opts.name = os.path.split(opts.source)[1]
+    #if opts.name == "":
+    #    opts.name = os.path.split(opts.source)[1]
 
     # If there are thumbnails, get a list of those files from the spec provided.
     if opts.thumbnails:
@@ -154,29 +156,39 @@ if __name__ == "__main__":
     else:
         opts.thumbnails = None
 
+    if opts.repo == "":
+        opts.repo = None
+
     # Validate the inputs
     validate_options()
 
-    # Convert metadata to a dictionary
-    metadata = dict()
-    if opts.metadata:
-        for item in opts.metadata:
-            metadata[item.split("=")[0]] = item.split("=")[1]
+    try:
 
-    # TODO: Publish code goes here
+        librarian = librarianclient.LibrarianClient(opts.language)
+        print(librarian.get_publish_loc(opts.token, opts.repo))
 
-    asset_obj = asset.Asset(name=opts.name,
-                            asset_parent_d=opts.destination,
-                            src_p=opts.source,
-                            metadata=metadata,
-                            keywords=opts.keywords,
-                            notes=opts.notes,
-                            thumbnails=opts.thumbnails,
-                            merge=not opts.nomerge,
-                            poster_frame=opts.poster_frame,
-                            pins=opts.pins,
-                            verify_copy=opts.verify,
-                            language=opts.language,
-                            )
+        # # Convert metadata to a dictionary
+        # metadata = dict()
+        # if opts.metadata:
+        #     for item in opts.metadata:
+        #         metadata[item.split("=")[0]] = item.split("=")[1]
+        #
+        # asset_obj = asset.Asset(name=opts.name,
+        #                         asset_parent_d=opts.destination,
+        #                         src_p=opts.source,
+        #                         metadata=metadata,
+        #                         keywords=opts.keywords,
+        #                         notes=opts.notes,
+        #                         thumbnails=opts.thumbnails,
+        #                         merge=not opts.nomerge,
+        #                         poster_frame=opts.poster_frame,
+        #                         pins=opts.pins,
+        #                         verify_copy=opts.verify,
+        #                         language=opts.language,
+        #                         )
+        #
+        # asset_obj.publish()
 
-    asset_obj.publish()
+    except SquirrelError as e:
+        print(e.message)
+        sys.exit(e.errno)
