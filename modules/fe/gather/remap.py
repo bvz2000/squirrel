@@ -93,25 +93,27 @@ class Remap(object):
 
                If None, loads the GATHER_MAPPING defined at the top of this
                module. Defaults to None.
-    :param padding: Any padding to use when expanding frame specs. If None, then
-           the padding will be determined from the longest number in the
-           sequence. Defaults to None.
-    :param udim_identifier: The string that is used as the UDIM identifier. If
-           None, then the pattern "<UDIM>" will be used. Defaults to None.
-    :param strict_udim_format: If True, then UDIM's will have to conform to the
-           #### format, where the starting value is 1001. If False, then the
-           UDIM must start with four digits, but can then contain any extra
-           characters. Substance Painter allows this for example. Note, setting
-           this to False may lead to somewhat erroneous identification of UDIM's
-           in files, so - unless absolutely needed - this should be se to True.
-           Defaults to True.
-    :param match_hash_length: If True, then the output regex will be designed
-           such that the number of digits has to match the number of hashes.
-           If False, then a single hash would match any number of digits.
-           For example: if True, then filename.#.exr would only match files with
-           a single digit sequence number. If False, then any sequence number,
-           no matter how long, would match. If the sequence identifier is in the
-           printf format, this argument is ignored.
+        :param padding: Any padding to use when expanding frame specs. If None,
+               then the padding will be determined from the longest number in
+               the sequence. Defaults to None.
+        :param udim_identifier: The string that is used as the UDIM identifier.
+               If None, then the pattern "<UDIM>" will be used. Defaults to
+               None.
+        :param strict_udim_format: If True, then UDIM's will have to conform to
+               the #### format, where the starting value is 1001. If False, then
+               the UDIM must start with four digits, but can then contain any
+               extra characters. Substance Painter allows this for example.
+               Note, setting this to False may lead to somewhat erroneous
+               identification of UDIM's in files, so - unless absolutely
+               needed - this should be se to True. Defaults to True.
+        :param match_hash_length: If True, then the output regex will be
+               designed such that the number of digits has to match the number
+               of hashes. If False, then a single hash would match any number of
+               digits. For example: if True, then filename.#.exr would only
+               match files with a single digit sequence number. If False, then
+               any sequence number, no matter how long, would match. If the
+               sequence identifier is in the printf format, this argument is
+               ignored.
 
         :return: Nothing.
         """
