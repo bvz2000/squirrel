@@ -376,6 +376,44 @@ class Repo(object):
         return output
 
     # --------------------------------------------------------------------------
+    def get_next_from_broken_token(self, token):
+        """
+        Given a token that is broken (i.e. is not a valid token or is an
+        incomplete token in that it does not extend all the way down to the leaf
+        level), return the portion of the token that is valid, plus a list of
+        possible next items.
+
+        :param token: The broken token.
+
+        :return: A tuple where the first item is the portion of the token that
+                 is valid, and the second item is a list of possible next
+                 tokens.
+        """
+
+        if self.token_is_valid(token) and self.token_is_leaf(token):
+            return token, []
+
+        valid = ""
+        possible_next = list()
+
+        token = self.format_token(token)
+
+        for i in range(len(token.split("/")) + 1):
+            test_token = "/".join(token.split("/")[:i])
+            if self.token_is_valid(test_token):
+                valid = test_token
+            else:
+                possible_next = self.get_next_tokens(valid)
+                break
+
+        if not possible_next and not self.token_is_leaf(valid):
+            possible_next = self.get_next_tokens(valid)
+
+        possible_next.sort()
+
+        return valid, possible_next
+
+    # --------------------------------------------------------------------------
     def path_is_repo_leaf(self, path_p):
         """
         Returns true if the given path is a leaf structure dir, False
@@ -443,14 +481,28 @@ class Repo(object):
         return output
 
     # --------------------------------------------------------------------------
-    def publish(self, source_p):
+    def get_publish_loc(self, token):
         """
-        Publishes the passed source path to the current repo.
+        Returns the path where an asset should be stored.
 
-        :param source_p: The path to the file or directory to publish.
+        :param token: The token that defines where in the repo structure to
+               publish.
 
         :return: Nothing
         """
 
-        # TODO:
-        pass
+        if not self.token_is_valid(token) or not self.token_is_leaf(token):
+
+            valid, possible_next = self.get_next_from_broken_token(token)
+
+            if valid:
+                msg = self.resc.message("possible_next")
+            else:
+                msg = self.resc.message("possible_next_empty_valid")
+
+            msg = msg.format(valid=valid,
+                             possible_next="\n   ".join(possible_next))
+
+            raise SquirrelError(msg, 0)
+
+        return self.get_path_from_token(token)
