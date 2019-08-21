@@ -27,12 +27,19 @@ def repo_name_is_valid(repo_name):
 
 # --------------------------------------------------------------------------
 def file_is_within_repo(file_p,
-                        repo_name,
+                        repo_names,
                         check_all_repos):
     repo_manager_obj = manager.RepoManager()
     return repo_manager_obj.file_is_within_repo(file_p,
-                                                repo_name,
+                                                repo_names,
                                                 check_all_repos)
+
+
+# --------------------------------------------------------------------------
+def get_gather_loc():
+    repo_manager_obj = manager.RepoManager()
+    return repo_manager_obj.get_gather_loc()
+
 
 # # ------------------------------------------------------------------------------
 # def is_published(file_p):
