@@ -144,14 +144,64 @@ class LibrarianClient(object):
 
     # --------------------------------------------------------------------------
     def token_is_valid(self,
-                       token_path):
+                       token):
         """
         Returns whether or not a token is valid.
 
-        :return:
+        :return: True if the token is valid, false otherwise.
         """
 
         if self.local_mode:
-            return schemainterface.token_is_valid(token_path)
+            return schemainterface.token_is_valid(token)
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
+
+    # --------------------------------------------------------------------------
+    def get_gather_loc(self):
+        """
+        Returns where files should be gathered to.
+
+        :return: The path where to gather the files
+        """
+
+        if self.local_mode:
+            return schemainterface.get_gather_loc()
+        else:
+            raise SquirrelError("Remote operation not yet implemented.", 1)
+
+    # --------------------------------------------------------------------------
+    def get_publish_loc(self,
+                        token,
+                        repo):
+        """
+        Returns where the asset should be published to.
+
+        :return: The path where to store (probably versioned) copies of the
+                 files.
+        """
+
+        if self.local_mode:
+            return schemainterface.get_publish_loc(token, repo)
+        else:
+            raise SquirrelError("Remote operation not yet implemented.", 1)
+
+    # ------------------------------------------------------------------------------
+    def publish(self,
+                path_p):
+
+        # TODO
+        if self.local_mode:
+
+            asset_obj = asset.Asset(name=opts.name,
+                                asset_parent_d=opts.destination,
+                                src_p=opts.source,
+                                metadata=metadata,
+                                keywords=opts.keywords,
+                                notes=opts.notes,
+                                thumbnails=opts.thumbnails,
+                                merge=not opts.nomerge,
+                                poster_frame=opts.poster_frame,
+                                pins=opts.pins,
+                                verify_copy=opts.verify,
+                                language=opts.language,
+                                )
