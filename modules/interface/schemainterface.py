@@ -41,65 +41,7 @@ def get_gather_loc():
     return repo_manager_obj.get_gather_loc()
 
 
-# # ------------------------------------------------------------------------------
-# def is_published(file_p):
-#     """
-#     Checks the publishing system to see if the current file path is a file that
-#     is already published (i.e. being managed by the publishing system).
-#
-#     :param file_p: The full path to the file we are testing.
-#
-#     :return: True if it is being managed by the publishing system. False
-#              otherwise.
-#     """
-#
-#     squirrel_app = squirrel.application.Application()
-#     return squirrel_app.item_is_in_any_repo(file_p)
-#
-#
-# # ------------------------------------------------------------------------------
-# def validate_asset_name(asset_name, repo):
-#     """
-#     Given a name and a repository, validates that the name is legal. If it is
-#     not, raises a NameError with a description of how the name violates the
-#     rules.
-#
-#     :param asset_name: The name being validated.
-#     :param repo: The repository that knows what a legal name looks like.
-#
-#     :return: Nothing.
-#     """
-#
-#     squirrel_app = squirrel.application.Application()
-#     result = squirrel_app.validate_asset_name(asset_name, repo)
-#
-#     if not result[0]:
-#         raise NameError(result[1])
-#
-#
-# # ------------------------------------------------------------------------------
-# def publish(repo, files_d):
-#     """
-#     Given a repository and a path to a directory of files, tell the back end
-#     publishing system to publish this directory.
-#
-#     :param repo: The repository where we are publishing.
-#     :param files_d: The directory of files to be published.
-#
-#     :return: Nothing (though I should return a status here I guess).
-#     """
-#
-#     squirrel_app = squirrel.application.Application()
-#     squirrel_app.publish(repo, files_d)
-#
-#
-# # ------------------------------------------------------------------------------
-# def token_is_valid(token_path):
-#     """
-#     Given a token path, returns whether it is valid or not.
-#
-#     :param token_path:
-#     :return:
-#     """
-#
-#     repo_obj = repo.
+# --------------------------------------------------------------------------
+def get_publish_loc(token, repo):
+    repo_manager_obj = manager.RepoManager()
+    return repo_manager_obj.get_publish_loc(token, repo)
