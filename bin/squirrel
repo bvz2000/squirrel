@@ -1,0 +1,135 @@
+#! /usr/bin/env python2
+
+"""
+License
+--------------------------------------------------------------------------------
+Squirrel is released under version 3 of the GNU General Public License.
+
+squirrel
+Copyright (C) 2019  Bernhard VonZastrow
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+from __future__ import print_function
+
+from __future__ import print_function
+
+import importlib
+import inspect
+import os
+import sys
+
+from bvzlib import options
+from bvzlib import resources
+
+OPTIONS = [
+    "sub_command",
+    "list_sub_commands",
+    "language",
+]
+
+
+# ------------------------------------------------------------------------------
+def validate_options():
+    """
+    Validates that the options passed are internally consistent,and complete.
+
+    :return: Nothing.
+    """
+
+    pass
+
+
+# ==============================================================================
+if __name__ == "__main__":
+
+    app_name = os.path.split(sys.argv[0])[1]
+
+    # Extract the language from the sys.argv if it is there
+    language = "english"
+    if "-language" in sys.argv:
+        idx = sys.argv.index("-language")
+        try:
+            language = sys.argv[idx]
+        except IndexError:
+            pass
+
+    module_d = os.path.split(inspect.stack()[0][1])[0]
+    resources_d = os.path.join(module_d, "..", "resources")
+    resc = resources.Resources(resources_d, "bin_squirrel", language)
+
+    sub_commands = list()
+    files_n = os.listdir(module_d)
+    for file_n in files_n:
+        if file_n.startswith("squirrel-"):
+            sub_commands.append(file_n.split("-")[1])
+    sub_commands.sort()
+
+    local_args = list()
+    sub_command_args = list()
+    local_mode = True
+    for arg in sys.argv[1:]:
+        if arg in sub_commands:
+            local_args.append(arg)
+            local_mode = False
+            continue
+        if local_mode:
+            local_args.append(arg)
+        else:
+            sub_command_args.append(arg)
+
+    # If NO args were passed, act as though -L were passed.
+    if len(sys.argv) == 1:
+        local_args.append("-L")
+
+    # There must ALWAYS be a sub-command even if we don't actually use it.
+    if "-L" in local_args or "--list-sub-commands" in local_args:
+        found = False
+        for arg in local_args:
+            if not arg.startswith("-"):
+                found = True
+        if not found:
+            local_args.append("placeholder_sub_command")
+
+    # Create and initialize the options object
+    try:
+        opts_obj = options.Options(OPTIONS, resc, local_args, language)
+    except ValueError as error:
+        print(error)
+        sys.exit()
+
+    opts = opts_obj.opts
+    sys.argv = opts_obj.args
+
+    # Validate the inputs
+    validate_options()
+
+    if opts.list_sub_commands:
+        msg = resc.message("list_sub_commands")
+        msg = msg.format(app_name=app_name)
+        print(msg)
+        for sub_command in sub_commands:
+            print("    ", sub_command)
+        sys.exit(0)
+
+    if opts.command not in sub_commands:
+        err = resc.error(100)
+        err.msg = err.msg.format(command=opts.command)
+        print(err.msg)
+        sys.exit(100)
+
+    cmd = os.path.join(module_d, "squirrel-" + opts.command)
+    cmd += " " + " ".join(sub_command_args)
+    os.system(cmd)
