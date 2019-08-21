@@ -513,3 +513,31 @@ class RepoManager(object):
             pass
 
         return tempfile.gettempdir()
+
+    # --------------------------------------------------------------------------
+    def get_publish_loc(self,
+                        token,
+                        repo_name=None):
+        """
+        Returns the path where files should be published to.
+
+        :return: A path where files should be published to.
+        """
+
+        if not repo_name:
+
+            repo_name = self.get_default_repo()
+
+            if not repo_name:
+                err = self.resc.error(103)
+                err.msg = err.msg.format()
+                raise SquirrelError(err.msg, err.code)
+
+        if not self.repo_name_is_valid(repo_name):
+            err = self.resc.error(102)
+            err.msg = err.msg.format(repo_name=repo_name)
+            raise SquirrelError(err.msg, err.code)
+
+        repo_obj = self.repos[repo_name]
+
+        return repo_obj.get_publish_loc(token)
