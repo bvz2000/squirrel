@@ -7,6 +7,7 @@ from bvzlib import resources
 
 from shared.squirrelerror import SquirrelError
 
+
 # ==============================================================================
 class Repo(object):
     """
@@ -26,7 +27,7 @@ class Repo(object):
                 passed as UNIX style relative paths even on Windows systems.
                 Tokens never resolve all the way down to the asset level. They
                 only describe the structure of the repo itself. They may contain
-                a leading slash, or omit it. Tokens ith or without leading
+                a leading slash, or omit it. Tokens with or without leading
                 slashes are functionally identical. They may also end with a
                 trailing slash or omit it. Again, tokens with or without
                 trailing slashes are functionally identical.
@@ -41,7 +42,7 @@ class Repo(object):
                 non-blessed directories may live at any level of the structure
                 except within the final, leaf level. At this leaf level are the
                 actual asset directories. The contents of the asset directories
-                must be managed by a separate application (squirrel for
+                must be managed by a separate process (the store module for
                 example).
     Managed:    A "managed" file or directory is any file or directory that is
                 below the structure level of the repo (i.e. within an asset that
@@ -50,7 +51,7 @@ class Repo(object):
     Assets:     Assets are directories that contain files. Assets are defined to
                 only exist as special directories in the leaf structure dirs.
                 Asset structure is defined outside of this repo and must be
-                managed by another application (squirrel for example).
+                managed by another application (the store module for example).
 
 
     Some naming conventions:
@@ -440,3 +441,16 @@ class Repo(object):
             output.append(os.path.split(asset_p.rstrip("/"))[1])
 
         return output
+
+    # --------------------------------------------------------------------------
+    def publish(self, source_p):
+        """
+        Publishes the passed source path to the current repo.
+
+        :param source_p: The path to the file or directory to publish.
+
+        :return: Nothing
+        """
+
+        # TODO:
+        pass
