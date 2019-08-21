@@ -33,8 +33,6 @@ from bvzlib import filesystem
 from bvzlib import options
 from bvzlib import resources
 
-from shared.squirrelerror import SquirrelError
-
 from store import asset
 
 OPTIONS = [
