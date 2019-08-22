@@ -33,7 +33,9 @@ from bvzlib import filesystem
 from bvzlib import options
 from bvzlib import resources
 
-from store import asset
+from interface import storeinterface
+from shared.squirrelerror import SquirrelError
+
 
 OPTIONS = [
     "source",
@@ -168,27 +170,33 @@ if __name__ == "__main__":
     else:
         opts.thumbnails = None
 
-    # Validate the inputs
-    validate_options()
-
     # Convert metadata to a dictionary
     metadata = dict()
     if opts.metadata:
         for item in opts.metadata:
             metadata[item.split("=")[0]] = item.split("=")[1]
 
-    asset_obj = asset.Asset(name=opts.name,
-                            asset_parent_d=opts.destination,
-                            src_p=opts.source,
-                            metadata=metadata,
-                            keywords=opts.keywords,
-                            notes=opts.notes,
-                            thumbnails=opts.thumbnails,
-                            merge=not opts.nomerge,
-                            poster_frame=opts.poster_frame,
-                            pins=opts.pins,
-                            verify_copy=opts.verify,
-                            language=opts.language,
-                            )
+    # Validate the inputs
+    validate_options()
 
-    asset_obj.publish()
+    try:
+
+        store_interface = storeinterface.StoreInterface(
+            name=opts.name,
+            asset_parent_d=opts.destination,
+            src_p=opts.source,
+            metadata=metadata,
+            keywords=opts.keywords,
+            notes=opts.notes,
+            thumbnails=opts.thumbnails,
+            merge=not opts.nomerge,
+            poster_frame=opts.poster_frame,
+            pins=opts.pins,
+            verify_copy=opts.verify,
+            language=opts.language)
+
+        store_interface.store()
+
+    except SquirrelError as e:
+        print(e.message)
+        sys.exit(e.errno)
