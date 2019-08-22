@@ -33,9 +33,11 @@ from bvzlib import filesystem
 from bvzlib import options
 from bvzlib import resources
 
+from interface import nameinterface
+from interface import storeinterface
 from librarian import librarianclient
 from shared.squirrelerror import SquirrelError
-from store import asset
+
 
 OPTIONS = [
     "source",
@@ -147,8 +149,6 @@ if __name__ == "__main__":
     sys.argv = opts_obj.args
 
     opts.source = opts.source.rstrip("/")
-    #if opts.name == "":
-    #    opts.name = os.path.split(opts.source)[1]
 
     # If there are thumbnails, get a list of those files from the spec provided.
     if opts.thumbnails:
@@ -159,35 +159,44 @@ if __name__ == "__main__":
     if opts.repo == "":
         opts.repo = None
 
+    # Convert metadata to a dictionary
+    metadata = dict()
+    if opts.metadata:
+        for item in opts.metadata:
+            metadata[item.split("=")[0]] = item.split("=")[1]
+
     # Validate the inputs
     validate_options()
 
     try:
 
-        librarian = librarianclient.LibrarianClient(opts.language)
-        print(librarian.get_publish_loc(opts.token, opts.repo))
+        if not opts.token:
+            file_n = os.path.split(opts.source)[1]
+            name_interface = nameinterface.NameInterface(file_n,
+                                                         opts.repo,
+                                                         language)
+            name_interface.validate_name()
+            name_metadata = name_interface.extract_metadata_from_name()
+            opts.token = name_metadata[0]
 
-        # # Convert metadata to a dictionary
-        # metadata = dict()
-        # if opts.metadata:
-        #     for item in opts.metadata:
-        #         metadata[item.split("=")[0]] = item.split("=")[1]
-        #
-        # asset_obj = asset.Asset(name=opts.name,
-        #                         asset_parent_d=opts.destination,
-        #                         src_p=opts.source,
-        #                         metadata=metadata,
-        #                         keywords=opts.keywords,
-        #                         notes=opts.notes,
-        #                         thumbnails=opts.thumbnails,
-        #                         merge=not opts.nomerge,
-        #                         poster_frame=opts.poster_frame,
-        #                         pins=opts.pins,
-        #                         verify_copy=opts.verify,
-        #                         language=opts.language,
-        #                         )
-        #
-        # asset_obj.publish()
+        librarian = librarianclient.LibrarianClient(opts.language)
+        pub_loc = librarian.get_publish_loc(opts.token, opts.repo)
+
+        store_interface = storeinterface.StoreInterface(
+            name=os.path.split(opts.source)[1],
+            asset_parent_d=pub_loc,
+            src_p=opts.source,
+            metadata=metadata,
+            keywords=opts.keywords,
+            notes=opts.notes,
+            thumbnails=opts.thumbnails,
+            merge=not opts.nomerge,
+            poster_frame=opts.poster_frame,
+            pins=opts.pins,
+            verify_copy=opts.verify,
+            language=opts.language)
+
+        store_interface.store()
 
     except SquirrelError as e:
         print(e.message)
