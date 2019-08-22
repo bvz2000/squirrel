@@ -232,7 +232,7 @@ class Asset(object):
         # resources directory)
         config_p = os.path.join(config_d, "store.config")
         self.config_obj = config.Config(config_p,
-                                        envvars.SQUIRREL_STORE_CONFIG_PATH)
+                                        envvars.SQUIRREL_NAME_CONFIG_PATH)
 
         # Get the list of regex patterns that we will use to skip files
         skip_list_regex = self.config_obj.items("skip list regex")
@@ -279,7 +279,7 @@ class Asset(object):
         :return: The next available version number, formatted as v####.
         """
 
-        highest = int(self.prev_ver_d.split("v")[1])
+        highest = int(os.path.split(self.prev_ver_d)[1].split("v")[1])
         return "v" + str(highest + 1).rjust(4, "0")
 
     # --------------------------------------------------------------------------
@@ -460,7 +460,7 @@ class Asset(object):
         return files_merged
 
     # --------------------------------------------------------------------------
-    def store(self):
+    def copy_files(self):
         """
         Actually copy the files from self.src_p to self.asset_d. (Actually files
         will be copied to self.data_d and symlinks will be made in self.asset_d)
@@ -532,11 +532,11 @@ class Asset(object):
         return True
 
     # --------------------------------------------------------------------------
-    def publish(self):
+    def store(self):
         """
-        Publishes the self.src_p to a version subdir of self.asset_d.
+        Stores the self.src_p to a version subdir of self.asset_d.
 
-        :return: True if the publish was successful, False otherwise.
+        :return: True if the store was successful, False otherwise.
         """
 
         # Reserve a version number (this will also create the asset directory on
@@ -544,7 +544,7 @@ class Asset(object):
         self.reserve_version()
 
         # store the dir or file in this version
-        self.store()
+        self.copy_files()
 
         # Store the metadata.
         metadata_obj = meta.Metadata(asset_d=self.asset_d,
@@ -721,7 +721,7 @@ class Asset(object):
         shutil.rmtree(meta_d, ignore_errors=True)
 
     # --------------------------------------------------------------------------
-    def collapse(self, relink_or_del_pins=False):
+    def collapse(self, del_orphaned_pins=False):
         """
         Deletes all versions in an asset except the "LATEST".
 
@@ -729,11 +729,11 @@ class Asset(object):
         warnings before the user is allowed to execute it. There is no backup
         and there is no undo.
 
-        :param relink_or_del_pins: If True, then any pins that point to versions
+        :param del_orphaned_pins: If True, then any pins that point to versions
                that will be deleted will also be deleted. The one exception is
                the "CURRENT" pin, which will be reset to point to the "LATEST"
                version. If False, then if any pins are pointing to a version
-               that would be deleted, an error is raised.
+               that would be deleted, an error is raised. Defaults to False.
 
         :return: Nothing.
         """
@@ -741,7 +741,7 @@ class Asset(object):
         keep_ver_n = self.get_highest_ver()
         del_vers_n = self.invert_version_list([keep_ver_n])
 
-        if relink_or_del_pins:
+        if del_orphaned_pins:
             # Move the "CURRENT" pin to point to the latest version
             pin_obj = pin.Pin(self.asset_d, keep_ver_n, "CURRENT",
                               self.language)
