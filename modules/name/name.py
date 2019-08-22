@@ -25,14 +25,13 @@ import os
 
 from bvzlib import resources
 
-from librarian import librarianclient
-
-from schema import repo
+from interface import schemainterface
+from shared.squirrelerror import SquirrelError
 
 
 class Name(object):
     """
-    A class responsible for managing and validating an asset name.
+    A class responsible for managing and validating a name.
 
     A name consists of the following:
 
@@ -46,26 +45,29 @@ class Name(object):
     """
 
     # --------------------------------------------------------------------------
-    def __init__(self, name, repo_p, language="english"):
+    def __init__(self,
+                 name,
+                 repo_n = None,
+                 language="english"):
         """
         Init.
 
-        :param name: The name of the asset.
-        :param repo_p: The path to the root of the repo we are validating
-               against.
+        :param name: The name of the asset we are validating.
+        :param repo_n: The name of the repo we are validating against. If None,
+               then the default repo will be used.
         :param language: The language to use to communicate with the user. If
                omitted, defaults to "english".
         """
 
         self.name = name
+        self.repo_n = repo_n
 
         # Read in the resources
         module_d = os.path.split(inspect.stack()[0][1])[0]
         resources_d = os.path.join(module_d, "..", "..", "resources")
-        self.resc = resources.Resources(resources_d, language)
+        self.resc = resources.Resources(resources_d, "lib_name", language)
 
-        # Create a new repo object for this repo.
-        self.repo = repo.Repo(repo_p, language)
+        self.schema_interface = schemainterface.SchemaInterface()
 
     # --------------------------------------------------------------------------
     def validate_name_underscores(self):
@@ -82,17 +84,17 @@ class Name(object):
         # Error out if there are multiple underscores
         if "__" in self.name:
             err = self.resc.error(900)
-            raise NameError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         # Error out if the name begins with an underscore
         if self.name.startswith("_"):
             err = self.resc.error(907)
-            raise NameError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         # Error out if there are multiple underscores
         if self.name.endswith("_"):
             err = self.resc.error(908)
-            raise NameError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def validate_name_variant(self):
@@ -125,7 +127,7 @@ class Name(object):
         # If any of these fail, raise an error
         if missing_var:
             err = self.resc.error(901)
-            raise NameError(err.msg)
+            raise SquirrelError(err.msg, err.code)
 
         return variant
 
@@ -154,7 +156,8 @@ class Name(object):
 
             # Build the current token and check its validity
             token_path = "/".join(consumed_elements + [element])
-            if not self.repo.token_is_valid(token_path):
+            if not self.schema_interface.token_is_valid(token_path,
+                                                        self.repo_n):
                 break
             consumed_elements.append(element)
 
@@ -163,26 +166,29 @@ class Name(object):
         if consumed_elements:
             token_path = "/".join(consumed_elements)
         else:
-            possible_next = self.repo.get_next_tokens("")
+            possible_next = self.schema_interface.get_next_tokens("",
+                                                                  self.repo_n)
             err = self.resc.error(904)
-            err.msg = err.msg.format(possible_next=", ".join(possible_next))
-            raise NameError(err.msg)
+            err.msg = err.msg.format(possible_next="\n   ".join(possible_next))
+            raise SquirrelError(err.msg, err.code)
 
         # Though we now should have a fully legal token, this token must also
         # be a token all the way down to the leaf level.
-        if not self.repo.token_is_leaf(token_path):
+        if not self.schema_interface.token_is_leaf(token_path, self.repo_n):
 
             # Help the user by listing what the next possible (legal) tokens are
-            possible_next = self.repo.get_next_tokens(token_path)
+            possible_next = self.schema_interface.get_next_tokens(token_path,
+                                                                  self.repo_n)
             up_to_last_item = "_".join(consumed_elements).lstrip("_")
             err = self.resc.error(905)
             err.msg = err.msg.format(up_to_last_item=up_to_last_item,
-                                     possible_next=", ".join(possible_next))
-            raise NameError(err.msg)
+                                     possible_next="\n   ".join(possible_next))
+            raise SquirrelError(err.msg, err.code)
 
         # Return the portion of the name that is the token
-        token_str = token_path.lstrip("/").rstrip("/").replace("/", "_")
-        assert self.name.startswith(token_str)
+        token_str = token_path.lstrip("/").rstrip("/")
+        token_name = token_str.replace("/", "_")
+        assert self.name.startswith(token_name)
 
         return token_str
 
@@ -198,7 +204,7 @@ class Name(object):
                  NameError if there is no description
         """
 
-        assert self.name.startswith(token)
+        assert self.name.startswith(token.replace("/", "_"))
         assert self.name.endswith(variant)
 
         description = self.name[len(token):][:-1 * len(variant)]
@@ -208,8 +214,8 @@ class Name(object):
         # really a description.
         if len(description) <= 2:
             err = self.resc.error(906)
-            err.msg = err.msg.format(up_to_last_item=token)
-            raise NameError(err.msg)
+            err.msg = err.msg.format(up_to_last_item=token.replace("/", "_"))
+            raise SquirrelError(err.msg, err.code)
 
         # Get rid of the leading and trailing underscores.
         description = description.lstrip("_").rstrip("_")
@@ -222,8 +228,8 @@ class Name(object):
         Given a name, extracts the metadata from it.
 
         :return: A tuple the returns the name broken up into tokens, desc, and
-                 variant. Raises a NameError with an appropriate help message if
-                 the name is not properly formed.
+                 variant. Raises a SquirrelError with an appropriate help
+                 message if the name is not properly formed.
         """
 
         # Make sure there are no doubled up underscores
@@ -238,19 +244,16 @@ class Name(object):
         # Check to make sure there is a description
         desc = self.validate_name_desc(tokens, variant)
 
-        # Return the results broken up into the repo, tokens, desc, and variant
+        # Return the results broken up into the tokens, desc, and variant
         return tokens, desc, variant
 
     # --------------------------------------------------------------------------
     def validate_name(self):
         """
-        Given a name, returns True if it is valid, False if not.
+        Given a name, tries to validate it. Raises a SquirrelError if it does
+        not validate.
 
-        :return: True if the name is valid. False otherwise.
+        :return: Nothing.
         """
 
-        try:
-            self.extract_metadata_from_name()
-        except NameError:
-            return False
-        return True
+        self.extract_metadata_from_name()
