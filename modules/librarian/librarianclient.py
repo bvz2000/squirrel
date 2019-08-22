@@ -56,6 +56,8 @@ class LibrarianClient(object):
         config_d = os.path.join(module_d, "..", "..", "config")
         self.resc = resources.Resources(resources_d, "lib_librarian", language)
 
+        self.schema_interface = schemainterface.SchemaInterface()
+
         # Read the repo config file (if the user sets "REPO_CONFIG_PATH"
         # then that value will be used. Otherwise, read it from the app
         # resources directory
@@ -79,7 +81,7 @@ class LibrarianClient(object):
         """
 
         if self.local_mode:
-            return schemainterface.repo_name_is_valid(repo_name)
+            return self.schema_interface.repo_name_is_valid(repo_name)
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
@@ -92,7 +94,7 @@ class LibrarianClient(object):
         :return: The name of the default repo. If no default, returns None.
         """
         if self.local_mode:
-            return schemainterface.get_default_repo()
+            return self.schema_interface.get_default_repo()
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
@@ -118,9 +120,9 @@ class LibrarianClient(object):
         """
 
         if self.local_mode:
-            return schemainterface.file_is_within_repo(file_p,
-                                                       repo_names,
-                                                       check_all_repos)
+            return self.schema_interface.file_is_within_repo(file_p,
+                                                             repo_names,
+                                                             check_all_repos)
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
@@ -152,7 +154,7 @@ class LibrarianClient(object):
         """
 
         if self.local_mode:
-            return schemainterface.token_is_valid(token)
+            return self.schema_interface.token_is_valid(token)
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
@@ -165,7 +167,7 @@ class LibrarianClient(object):
         """
 
         if self.local_mode:
-            return schemainterface.get_gather_loc()
+            return self.schema_interface.get_gather_loc()
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
@@ -181,7 +183,7 @@ class LibrarianClient(object):
         """
 
         if self.local_mode:
-            return schemainterface.get_publish_loc(token, repo)
+            return self.schema_interface.get_publish_loc(token, repo)
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
