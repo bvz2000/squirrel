@@ -22,7 +22,8 @@ class RepoManager(object):
     """
 
     # --------------------------------------------------------------------------
-    def __init__(self, language="english"):
+    def __init__(self,
+                 language="english"):
         """
         Initialize the manager object responsible for managing different repos.
         Individual repos are managed by the repo class.
@@ -515,13 +516,20 @@ class RepoManager(object):
         return tempfile.gettempdir()
 
     # --------------------------------------------------------------------------
-    def get_publish_loc(self,
-                        token,
-                        repo_name=None):
+    def get_repo(self,
+                 repo_name=None):
         """
-        Returns the path where files should be published to.
+        Returns the repo object associated with the repo_name. Can accept a
+        repo_name of None which means return the default repo. Also manages
+        raising an error if no repo matches the name and/or no default repo
+        is set.
 
-        :return: A path where files should be published to.
+        :param repo_name: The name of the repo. If None, the default repo will
+               be returned. If there is no repo of this name, raises an error.
+               If None, and there is no default repo, raises an error. Defaults
+               to None.
+
+        :return: A repo object corresponding to the name given.
         """
 
         if not repo_name:
@@ -538,6 +546,73 @@ class RepoManager(object):
             err.msg = err.msg.format(repo_name=repo_name)
             raise SquirrelError(err.msg, err.code)
 
-        repo_obj = self.repos[repo_name]
+        return self.repos[repo_name]
+
+    # --------------------------------------------------------------------------
+    def get_publish_loc(self,
+                        token,
+                        repo_name=None):
+        """
+        Returns the path where files should be published to.
+
+        :return: A path where files should be published to.
+        """
+
+        repo_obj = self.get_repo(repo_name)
 
         return repo_obj.get_publish_loc(token)
+
+    # --------------------------------------------------------------------------
+    def token_is_valid(self,
+                       token,
+                       repo_name=None):
+        """
+        Returns whether the given token is valid for the given repo.
+
+        :param token: The token we are evaluating.
+        :param repo_name: The name of the repo we are validating against. If
+               None, then the default repo will be used.
+
+        :return: A path where files should be published to.
+        """
+
+        repo_obj = self.get_repo(repo_name)
+
+        return repo_obj.token_is_valid(token)
+
+    # --------------------------------------------------------------------------
+    def get_next_tokens(self,
+                        token,
+                        repo_name=None):
+        """
+        Given a token, returns what the next possible tokens will be.
+
+        :param token: The token we are evaluating.
+        :param repo_name: The name of the repo we are validating against. If
+               None, then the default repo will be used.
+
+        :return: A list of the next possible tokens.
+        """
+
+        repo_obj = self.get_repo(repo_name)
+
+        return repo_obj.get_next_tokens(token)
+
+    # --------------------------------------------------------------------------
+    def token_is_leaf(self,
+                      token,
+                      repo_name=None):
+        """
+        Given a token, returns whether it evaluates all the way down to the
+        leaf level.
+
+        :param token: The token we are evaluating.
+        :param repo_name: The name of the repo we are validating against. If
+               None, then the default repo will be used.
+
+        :return: True if the given token is a leaf, False otherwise.
+        """
+
+        repo_obj = self.get_repo(repo_name)
+
+        return repo_obj.token_is_leaf(token)
