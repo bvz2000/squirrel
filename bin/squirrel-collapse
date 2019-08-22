@@ -33,7 +33,9 @@ import sys
 from bvzlib import options
 from bvzlib import resources
 
-from store import asset
+from interface import storeinterface
+from shared.squirrelerror import SquirrelError
+#from store import asset
 
 OPTIONS = [
     "asset_path",
@@ -93,10 +95,6 @@ if __name__ == "__main__":
     validate_options()
 
     asset_parent_p, name = os.path.split(opts.asset_path)
-    asset_obj = asset.Asset(name=name,
-                            asset_parent_d=asset_parent_p,
-                            language=opts.language,
-                            )
 
     msg = resc.message("warning")
     msg = msg.format(asset_name=name)
@@ -109,4 +107,15 @@ if __name__ == "__main__":
             msg = resc.message("warning_re_enter")
             result = None
 
-    asset_obj.collapse()
+    try:
+
+        store_interface = storeinterface.StoreInterface(
+            name=name,
+            asset_parent_d=asset_parent_p,
+            language=opts.language)
+
+        store_interface.collapse(opts.removepins)
+
+    except SquirrelError as e:
+        print(e.message)
+        sys.exit(e.errno)
