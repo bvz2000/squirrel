@@ -23,9 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import inspect
 import os
 
+from bvzlib import config
 from bvzlib import resources
 
 from interface import schemainterface
+from shared import envvars
 from shared.squirrelerror import SquirrelError
 
 
@@ -65,9 +67,64 @@ class Name(object):
         # Read in the resources
         module_d = os.path.split(inspect.stack()[0][1])[0]
         resources_d = os.path.join(module_d, "..", "..", "resources")
+        config_d = os.path.join(module_d, "..", "..", "config")
         self.resc = resources.Resources(resources_d, "lib_name", language)
 
+        self.config_p = os.path.join(config_d, "name.config")
+        self.config_obj = config.Config(self.config_p,
+                                        envvars.SQUIRREL_STORE_CONFIG_PATH)
+
+        self.validate_config()
+
         self.schema_interface = schemainterface.SchemaInterface()
+
+    # --------------------------------------------------------------------------
+    def validate_config(self):
+        """
+        Makes sure the config file is valid. Raises a squirrel error if not.
+
+        :return: Nothing.
+        """
+
+        sections = ["tokens",
+                    "description",
+                    "variant",
+                    ]
+        settings = ["allow_uppercase",
+                    "allow_lowercase",
+                    ]
+
+        # Check sections
+        for section in sections:
+            try:
+                assert self.config_obj.has_section(section)
+            except AssertionError:
+                err = self.resc.error(101)
+                err.msg = err.msg.format(config_p=self.config_p,
+                                         section=section)
+                raise SquirrelError(err.msg, err.code)
+
+        # Check individual settings
+        for section in sections:
+            for setting in settings:
+                try:
+                    assert self.config_obj.has_option(section, setting)
+                except AssertionError:
+                    err = self.resc.error(102)
+                    err.msg = err.msg.format(config_p=self.config_p,
+                                             setting=setting,
+                                             section=section)
+                    raise SquirrelError(err.msg, err.code)
+
+        # Check for conflicting settings
+        for section in sections:
+            allow_upper = self.config_obj.getboolean(section, "allow_uppercase")
+            allow_lower = self.config_obj.getboolean(section, "allow_lowercase")
+            if allow_upper is False and allow_lower is False:
+                err = self.resc.error(103)
+                err.msg = err.msg.format(config_p=self.config_p,
+                                         section=section)
+                raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def validate_name_underscores(self):
@@ -106,6 +163,10 @@ class Name(object):
                  help message if the variant does not validate.
         """
 
+        allow_upper = self.config_obj.getboolean("variant", "allow_uppercase")
+        allow_lower = self.config_obj.getboolean("variant", "allow_lowercase")
+        assert not(allow_upper is False and allow_lower is False)
+
         variant = self.name.split("_")[-1]
 
         # Assume it is there
@@ -119,9 +180,17 @@ class Name(object):
         if variant == "":
             missing_var = True
 
-        # Must be an uppercase alphabetic character
+        legal_upper_chars = ""
+        if allow_upper:
+            legal_upper_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+        legal_lower_chars = ""
+        if allow_lower:
+            legal_lower_chars = "abcdefghijklmnopqrstuvwxyz"
+
+        legal_chars = legal_upper_chars + legal_lower_chars
         for char in variant:
-            if char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            if char not in legal_chars:
                 missing_var = True
 
         # If any of these fail, raise an error
@@ -143,6 +212,10 @@ class Name(object):
 
         :return: The portion of the name that is a valid token.
         """
+
+        allow_upper = self.config_obj.getboolean("tokens", "allow_uppercase")
+        allow_lower = self.config_obj.getboolean("tokens", "allow_lowercase")
+        assert not(allow_upper is False and allow_lower is False)
 
         # Make sure we have no multiple underscores.
         self.validate_name_underscores()
@@ -190,6 +263,19 @@ class Name(object):
         token_name = token_str.replace("/", "_")
         assert self.name.startswith(token_name)
 
+        if not allow_upper and allow_lower:
+            if not allow_lower:
+                if token_name.islower():
+                    err = self.resc.error(801)
+                    err.msg = err.msg.format(token=token_name)
+                    raise SquirrelError(err.msg, err.code)
+
+            if not allow_upper:
+                if token_name.isupper():
+                    err = self.resc.error(802)
+                    err.msg = err.msg.format(token=token_name)
+                    raise SquirrelError(err.msg, err.code)
+
         return token_str
 
     # --------------------------------------------------------------------------
@@ -207,6 +293,12 @@ class Name(object):
         assert self.name.startswith(token.replace("/", "_"))
         assert self.name.endswith(variant)
 
+        allow_upper = self.config_obj.getboolean("description",
+                                                 "allow_uppercase")
+        allow_lower = self.config_obj.getboolean("description",
+                                                 "allow_lowercase")
+        assert not(allow_upper is False and allow_lower is False)
+
         description = self.name[len(token):][:-1 * len(variant)]
 
         # description should be an underscore, followed by text, followed by
@@ -219,6 +311,20 @@ class Name(object):
 
         # Get rid of the leading and trailing underscores.
         description = description.lstrip("_").rstrip("_")
+
+        # Validate the case
+        if not allow_upper and allow_lower:
+            if not allow_lower:
+                if description.islower():
+                    err = self.resc.error(801)
+                    err.msg = err.msg.format(description=description)
+                    raise SquirrelError(err.msg, err.code)
+
+            if not allow_upper:
+                if description.isupper():
+                    err = self.resc.error(802)
+                    err.msg = err.msg.format(description=description)
+                    raise SquirrelError(err.msg, err.code)
 
         return description
 
