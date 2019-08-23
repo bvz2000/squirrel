@@ -5,6 +5,7 @@ import os
 from bvzlib import filesystem
 from bvzlib import resources
 
+from interface import storeinterface
 from shared.squirrelerror import SquirrelError
 
 
@@ -101,7 +102,9 @@ class Repo(object):
     """
 
     # --------------------------------------------------------------------------
-    def __init__(self, path, language="english"):
+    def __init__(self,
+                 path,
+                 language="english"):
         """
         Initialize the repo object (responsible for managing the schema of a
         single repo).
@@ -114,6 +117,8 @@ class Repo(object):
         module_d = os.path.split(inspect.stack()[0][1])[0]
         resources_d = os.path.join(module_d, "..", "..", "resources")
         self.resc = resources.Resources(resources_d, "lib_schema", language)
+
+        self.store_interface = storeinterface.StoreInterface(language)
 
         # Make sure the repo path even exists
         if not os.path.exists(path):
@@ -160,7 +165,8 @@ class Repo(object):
         return token.lstrip("/").rstrip("/")
 
     # --------------------------------------------------------------------------
-    def get_path_from_token(self, token):
+    def get_path_from_token(self,
+                            token):
         """
         Given a token, returns a path appropriate to the OS being used. No error
         checking is done to ensure this is an actual path on disk. No error
@@ -176,7 +182,8 @@ class Repo(object):
         return os.path.join(self.repo_root_d, tokens_p)
 
     # --------------------------------------------------------------------------
-    def get_token_from_path(self, path_p):
+    def get_token_from_path(self,
+                            path_p):
         """
         Given a path, returns a token (a relative path in UNIX-style format). If
         the path is not a valid path in the current repo, raises an error. Note
@@ -224,7 +231,8 @@ class Repo(object):
         return self.format_token(token.replace(os.path.sep, "/"))
 
     # --------------------------------------------------------------------------
-    def token_is_valid(self, token):
+    def token_is_valid(self,
+                       token):
         """
         Given a token, checks to see if it is a valid repo structure path.
 
@@ -239,7 +247,8 @@ class Repo(object):
         return self.path_is_repo_structure(path_p)
 
     # --------------------------------------------------------------------------
-    def token_is_leaf(self, token):
+    def token_is_leaf(self,
+                      token):
         """
         Given a token, checks to see if it is a valid repo structure path AND
         that it is a leaf (i.e. the last directory in the repo structure before
@@ -263,7 +272,8 @@ class Repo(object):
         return True
 
     # --------------------------------------------------------------------------
-    def get_next_tokens(self, token):
+    def get_next_tokens(self,
+                        token):
         """
         Given a token, returns a list of the next possible tokens.
 
@@ -280,7 +290,8 @@ class Repo(object):
         return self.get_next_structure_names(path_p)
 
     # --------------------------------------------------------------------------
-    def path_is_within_repo(self, path_p):
+    def path_is_within_repo(self,
+                            path_p):
         """
         Checks to see if the path is either part of the repo structure or
         contained with an asset managed by this repo. Does not validate that the
@@ -294,7 +305,8 @@ class Repo(object):
         return path_p.startswith(self.repo_root_d)
 
     # --------------------------------------------------------------------------
-    def path_is_repo_structure(self, path_p):
+    def path_is_repo_structure(self,
+                               path_p):
         """
         Checks to see if the given path is a part of the structure of the repo
         (vs. being an asset file or dir, or even outside of the repo
@@ -339,7 +351,8 @@ class Repo(object):
         return True
 
     # --------------------------------------------------------------------------
-    def path_is_repo_root(self, path_p):
+    def path_is_repo_root(self,
+                          path_p):
         """
         Returns true if the given path is the root path of the repo, False
         otherwise.
@@ -352,7 +365,8 @@ class Repo(object):
         return path_p == self.repo_root_d
 
     # --------------------------------------------------------------------------
-    def get_next_structure_names(self, path_p):
+    def get_next_structure_names(self,
+                                 path_p):
         """
         Given a path, return the names (not paths) of any sub-directories that
         are also part of the repo structure.
@@ -376,7 +390,8 @@ class Repo(object):
         return output
 
     # --------------------------------------------------------------------------
-    def get_next_from_broken_token(self, token):
+    def get_next_from_broken_token(self,
+                                   token):
         """
         Given a token that is broken (i.e. is not a valid token or is an
         incomplete token in that it does not extend all the way down to the leaf
@@ -414,7 +429,8 @@ class Repo(object):
         return valid, possible_next
 
     # --------------------------------------------------------------------------
-    def path_is_repo_leaf(self, path_p):
+    def path_is_repo_leaf(self,
+                          path_p):
         """
         Returns true if the given path is a leaf structure dir, False
         otherwise. A leaf is the very last path item in the repo structure.
@@ -434,7 +450,8 @@ class Repo(object):
         return True
 
     # --------------------------------------------------------------------------
-    def list_asset_paths(self, token=""):
+    def list_asset_paths(self,
+                         token=""):
         """
         Returns a list of all the asset paths under the token given by token. If
         the token is not valid, raise an error.
@@ -456,12 +473,13 @@ class Repo(object):
         repo_d = self.get_path_from_token(token)
 
         for dir_d, files_n, dirs_n in os.walk(repo_d):
-            if publisherInterface.path_is_asset_root(dir_d):
+            if self.store_interface.path_is_asset_root(dir_d):
                 output.append(dir_d.rstrip(os.path.sep) + os.path.sep)
         return output
 
     # --------------------------------------------------------------------------
-    def list_asset_names(self, token=""):
+    def list_asset_names(self,
+                         token=""):
         """
         Returns a list of all the asset names under the token given by token. If
         the token is not valid, raise an error.
@@ -481,7 +499,8 @@ class Repo(object):
         return output
 
     # --------------------------------------------------------------------------
-    def get_publish_loc(self, token):
+    def get_publish_loc(self,
+                        token):
         """
         Returns the path where an asset should be stored.
 
