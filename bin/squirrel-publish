@@ -35,7 +35,7 @@ from bvzlib import resources
 
 from interface import nameinterface
 from interface import storeinterface
-from librarian import librarianclient
+from librarian import librarian
 from shared.squirrelerror import SquirrelError
 
 
@@ -170,19 +170,18 @@ if __name__ == "__main__":
 
     try:
 
+        librarian = librarian.Librarian(opts.language)
+
         if not opts.token:
             file_n = os.path.split(opts.source)[1]
-            name_interface = nameinterface.NameInterface(file_n,
-                                                         opts.repo,
-                                                         language)
-            name_interface.validate_name()
-            name_metadata = name_interface.extract_metadata_from_name()
+            librarian.validate_name(file_n, opts.repo)
+            name_metadata = librarian.extract_metadata_from_name(file_n,
+                                                                 opts.repo)
             opts.token = name_metadata[0]
 
-        librarian = librarianclient.LibrarianClient(opts.language)
         pub_loc = librarian.get_publish_loc(opts.token, opts.repo)
 
-        store_interface = storeinterface.StoreInterface(
+        librarian.store(
             name=os.path.split(opts.source)[1],
             asset_parent_d=pub_loc,
             src_p=opts.source,
@@ -193,10 +192,7 @@ if __name__ == "__main__":
             merge=not opts.nomerge,
             poster_frame=opts.poster_frame,
             pins=opts.pins,
-            verify_copy=opts.verify,
-            language=opts.language)
-
-        store_interface.store()
+            verify_copy=opts.verify)
 
     except SquirrelError as e:
         print(e.message)
