@@ -28,6 +28,8 @@ that runs under Linux and MacOS. At the moment, it does not run under
 Windows, though this is planned for a future release. It was developed on a
 Linux Manjaro system running Python 2.7.
 
+# NOTE: Squirrel is in pre-alpha and does not fully work yet.
+
 Features that will be part of the 1.0 release:
 --------------------------------------------------------------------------------
 
