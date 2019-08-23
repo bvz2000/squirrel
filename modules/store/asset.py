@@ -94,12 +94,97 @@ class Asset(object):
     """
 
     # --------------------------------------------------------------------------
-    def __init__(self, name, asset_parent_d, src_p=None, metadata=None,
-                 keywords=None, notes=None, thumbnails=None, poster_frame=None,
-                 merge=True, pins=None, verify_copy=False, language="english"):
+    def __init__(self,
+                 language):
         """
-        An object responsible for copying a directory (or file) from one
-        location to another (versioned) location.
+        :param language: The language used for communication with the end user.
+               Defaults to "english".
+
+        :return: Nothing.
+        """
+
+        module_d = os.path.split(inspect.stack()[0][1])[0]
+        resources_d = os.path.join(module_d, "..", "..", "resources")
+        config_d = os.path.join(module_d, "..", "..", "config")
+        self.resc = resources.Resources(resources_d, "lib_store", language)
+
+        self.language = language
+
+        self.config_p = os.path.join(config_d, "store.config")
+        self.config_obj = config.Config(self.config_p,
+                                        envvars.SQUIRREL_NAME_CONFIG_PATH)
+
+        self.validate_config()
+
+        self.src_p = None
+        self.name = None
+        self.asset_parent_d = None
+        self.asset_d = None
+        self.data_d = None
+        self.data_sizes = None
+        self.thumbnail_data_d = None
+        self.prev_ver_n = None
+        self.prev_ver_d = None
+        self.curr_ver_n = None
+        self.curr_ver_d = None
+        self.metadata_d = None
+        self.metadata = None
+        self.keywords = None
+        self.notes = None
+        self.thumbnails = None
+        self.poster_frame = None
+        self.merge = None
+        self.pins = None
+        self.verify_copy = None
+        self.skip_list_regex = None
+
+    # --------------------------------------------------------------------------
+    def validate_config(self):
+        """
+        Makes sure the config file is valid. Raises a squirrel error if not.
+
+        :return: Nothing.
+        """
+
+        sections = dict()
+        sections["skip list regex"] = [None]
+
+        # Check sections
+        for section in sections:
+            try:
+                assert self.config_obj.has_section(section)
+            except AssertionError:
+                err = self.resc.error(501)
+                err.msg = err.msg.format(config_p=self.config_p,
+                                         section=section)
+                raise SquirrelError(err.msg, err.code)
+
+            for setting in sections[section]:
+                if setting:
+                    try:
+                        assert self.config_obj.has_option(section, setting)
+                    except AssertionError:
+                        err = self.resc.error(502)
+                        err.msg = err.msg.format(config_p=self.config_p,
+                                                 setting=setting,
+                                                 section=section)
+                        raise SquirrelError(err.msg, err.code)
+
+    # --------------------------------------------------------------------------
+    def set_attributes(self,
+                       name,
+                       asset_parent_d,
+                       src_p=None,
+                       metadata=None,
+                       keywords=None,
+                       notes=None,
+                       thumbnails=None,
+                       poster_frame=None,
+                       merge=True,
+                       pins=None,
+                       verify_copy=False):
+        """
+        Sets the attributes for the current asset.
 
         :param name: The name of the thing we are storing. Note that this is not
                necessarily the file name of the thing we are storing (though you
@@ -187,16 +272,9 @@ class Asset(object):
         :param verify_copy: If True, then an md5 checksum will be done on each
                source and each copy to ensure that the file was copied
                correctly. Defaults to False.
-        :param language: The language used for communication with the end user.
-               Defaults to "english".
         """
 
         assert name != ""
-
-        module_d = os.path.split(inspect.stack()[0][1])[0]
-        resources_d = os.path.join(module_d, "..", "..", "resources")
-        config_d = os.path.join(module_d, "..", "..", "config")
-        self.resc = resources.Resources(resources_d, "lib_store", language)
 
         self.src_p = src_p
         self.name = name
@@ -212,10 +290,6 @@ class Asset(object):
         self.prev_ver_n = self.get_highest_ver()
         self.prev_ver_d = os.path.join(self.asset_d, self.prev_ver_n)
 
-        self.curr_ver_n = None
-        self.curr_ver_d = None
-        self.metadata_d = None
-
         self.metadata = metadata
         self.keywords = keywords
         self.notes = notes
@@ -225,14 +299,6 @@ class Asset(object):
         self.merge = merge
         self.pins = pins
         self.verify_copy = verify_copy
-        self.language = language
-
-        # Read the squirrel config file (if the user sets the env variable
-        # then that value will be used. Otherwise, read it from the app
-        # resources directory)
-        config_p = os.path.join(config_d, "store.config")
-        self.config_obj = config.Config(config_p,
-                                        envvars.SQUIRREL_NAME_CONFIG_PATH)
 
         # Get the list of regex patterns that we will use to skip files
         skip_list_regex = self.config_obj.items("skip list regex")
