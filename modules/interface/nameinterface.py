@@ -17,23 +17,14 @@ class NameInterface(object):
 
     # --------------------------------------------------------------------------
     def __init__(self,
-                 item_n,
-                 repo_n,
                  language="english"):
-        """
-        Initialize the interface.
+        self.name_obj = name.Name(language=language)
 
-        :param item_n: The name we are trying to validate.
-        :param repo_n: The repo against which we are validating the name.
-        :param language: The language used for communication with the end user.
-               Defaults to "english".
-
-        :return: Nothing.
-        """
-
-        self.name_obj = name.Name(name=item_n,
-                                  repo_n=repo_n,
-                                  language=language)
+    # --------------------------------------------------------------------------
+    def set_attributes(self,
+                       item_n=None,
+                       repo_n=None):
+        self.name_obj.set_attributes(item_n, repo_n)
 
     # --------------------------------------------------------------------------
     def validate_name(self):
