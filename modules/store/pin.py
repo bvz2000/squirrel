@@ -27,6 +27,8 @@ from bvzlib import resources
 
 from shared.squirrelerror import SquirrelError
 
+
+# ==============================================================================
 class Pin(object):
     """
     Class responsible for managing pins for squirrel. Pins are symlinks to
@@ -34,7 +36,11 @@ class Pin(object):
     """
 
     # --------------------------------------------------------------------------
-    def __init__(self, asset_d, version_name, pin_name, language="english"):
+    def __init__(self,
+                 asset_d,
+                 version_name,
+                 pin_name,
+                 language="english"):
         """
         An object responsible for managing pins.
         """
