@@ -37,12 +37,13 @@ class RepoManager(object):
         config_d = os.path.join(module_d, "..", "..", "config")
         self.resc = resources.Resources(resources_d, "lib_schema", language)
 
-        # Read the repo config file (if the user sets "REPO_CONFIG_PATH"
-        # then that value will be used. Otherwise, read it from the app
-        # resources directory
-        config_p = os.path.join(config_d, "schema.config")
-        self.config_obj = config.Config(config_p,
+        self.config_p = os.path.join(config_d, "schema.config")
+        self.config_obj = config.Config(self.config_p,
                                         envvars.SQUIRREL_SCHEMA_CONFIG_PATH)
+
+        self.store_interface = storeinterface.StoreInterface(language)
+
+        self.validate_config()
 
         self.language = language
 
@@ -53,7 +54,42 @@ class RepoManager(object):
         self.default_repo = self.get_default_repo()
 
     # --------------------------------------------------------------------------
-    def load_repo(self, repo_p):
+    def validate_config(self):
+        """
+        Makes sure the config file is valid. Raises a squirrel error if not.
+
+        :return: Nothing.
+        """
+        sections = dict()
+        sections["repos"] = [None]
+        sections["settings"] = ["warn_on_load_error",
+                                "fail_on_load_error",
+                                "default_repo",
+                                "default_gather_loc"]
+
+        for section in sections:
+            try:
+                assert self.config_obj.has_section(section)
+            except AssertionError:
+                err = self.resc.error(501)
+                err.msg = err.msg.format(config_p=self.config_p,
+                                         section=section)
+                raise SquirrelError(err.msg, err.code)
+
+            for setting in sections[section]:
+                if setting is not None:
+                    try:
+                        assert self.config_obj.has_option(section, setting)
+                    except AssertionError:
+                        err = self.resc.error(502)
+                        err.msg = err.msg.format(config_p=self.config_p,
+                                                 setting=setting,
+                                                 section=section)
+                        raise SquirrelError(err.msg, err.code)
+
+    # --------------------------------------------------------------------------
+    def load_repo(self,
+                  repo_p):
         """
         Loads a single repo.
 
@@ -67,7 +103,8 @@ class RepoManager(object):
         self.repos[repo_obj.name] = repo_obj
 
     # --------------------------------------------------------------------------
-    def unload_repo(self, repo_n):
+    def unload_repo(self,
+                    repo_n):
         """
         Unloads a single repo.
 
@@ -80,7 +117,8 @@ class RepoManager(object):
             del(self.repos[repo_n])
 
     # --------------------------------------------------------------------------
-    def load_repos_from_config(self, silence=False):
+    def load_repos_from_config(self,
+                               silence=False):
         """
         Loads all of the repos listed in the config file. Kicks up an error if
         any are missing or corrupt AND warn_on_load_error or fail_on_load_error
@@ -147,7 +185,8 @@ class RepoManager(object):
         return broken_repos
 
     # --------------------------------------------------------------------------
-    def repo_name_is_valid(self, repo_name):
+    def repo_name_is_valid(self,
+                           repo_name):
         """
         Given a repo name, does a very minimal check to see if the repo is
         valid. Basically checks to see if the name is in the list of loaded
@@ -162,7 +201,7 @@ class RepoManager(object):
 
     # --------------------------------------------------------------------------
     @staticmethod
-    def repo_path_is_valid(self, repo_path):
+    def repo_path_is_valid(repo_path):
         """
         Given a repo path, does a very minimal check to see if the repo is
         valid. Basically checks to see if the path is a directory and whether
@@ -184,7 +223,8 @@ class RepoManager(object):
         return True
 
     # --------------------------------------------------------------------------
-    def add_repo_to_config(self, repo_p):
+    def add_repo_to_config(self,
+                           repo_p):
         """
         Adds the repo given by the path repo_p to the config file.
 
@@ -209,7 +249,8 @@ class RepoManager(object):
         self.config_obj.save()
 
     # --------------------------------------------------------------------------
-    def add_repo(self, repo_p):
+    def add_repo(self,
+                 repo_p):
         """
         Adds the repo to the current object as well as to the config file.
 
@@ -222,7 +263,8 @@ class RepoManager(object):
         self.add_repo_to_config(repo_p)
 
     # --------------------------------------------------------------------------
-    def remove_repo_from_config(self, repo_n):
+    def remove_repo_from_config(self,
+                                repo_n):
         """
         Removes a repo from the config file.
 
@@ -242,7 +284,8 @@ class RepoManager(object):
         self.config_obj.save()
 
     # --------------------------------------------------------------------------
-    def remove_repo(self, repo_n):
+    def remove_repo(self,
+                    repo_n):
         """
         Removes the repo to the current object as well as from the config file.
 
@@ -280,7 +323,8 @@ class RepoManager(object):
         return default_repo
 
     # --------------------------------------------------------------------------
-    def set_default_repo(self, repo_n):
+    def set_default_repo(self,
+                         repo_n):
         """
         Sets the default repository.
 
@@ -317,7 +361,10 @@ class RepoManager(object):
         self.config_obj.save()
 
     # --------------------------------------------------------------------------
-    def bless_dir(self, path_d, root=False, name=None):
+    def bless_dir(self,
+                  path_d,
+                  root=False,
+                  name=None):
         """
         "Blesses" a particular path to include it as part of a repository. There
         are two types of blessed directories: Root and Normal. A Root directory
@@ -375,7 +422,7 @@ class RepoManager(object):
             # Root dirs can not be within an existing repo (no ancestor may be
             # a repo root directory)
             ancestor_d = filesystem.ancestor_contains_file(path_d,
-                                                         [".repo_root"])
+                                                           [".repo_root"])
             if ancestor_d:
                 err = self.resc.error(602)
                 err.msg = err.msg.format(path=path_d, repo=ancestor_d)
@@ -413,7 +460,9 @@ class RepoManager(object):
                 bless_obj.write(f)
 
     # --------------------------------------------------------------------------
-    def bless_tree(self, root_d, repo_name):
+    def bless_tree(self,
+                   root_d,
+                   repo_name):
         """
         Given a root directory, this will bless every sub-directory in the
         hierarchy (essentially creating a repo out of the hierarchy). If it runs
@@ -451,13 +500,16 @@ class RepoManager(object):
             del_dirs_n = list()
             for dir_n in dirs_n:
                 test_p = os.path.join(dir_d, dir_n)
-                if storeinterface.path_is_asset_root(test_p):
+                if self.store_interface.path_is_asset_root(test_p):
                     del_dirs_n.append(dir_n)
             for del_n in del_dirs_n:
                 dirs_n.remove(del_n)
 
     # --------------------------------------------------------------------------
-    def file_is_within_repo(self, file_p, repo_names, check_all_repos):
+    def file_is_within_repo(self,
+                            file_p,
+                            repo_names,
+                            check_all_repos):
         """
         Given the path to a file, check either the given repo or all repos (if
         check_all_repos is True) to see if that file is within the repo.
