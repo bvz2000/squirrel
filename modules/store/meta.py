@@ -32,14 +32,22 @@ from bvzlib import general
 from shared.squirrelerror import SquirrelError
 
 
+# ==============================================================================
 class Metadata(object):
     """
     Class responsible for managing thumbnails for squirrel.
     """
 
     # --------------------------------------------------------------------------
-    def __init__(self, asset_d, version_name, metadata=None, keywords=None,
-                 notes=None, thumbnails=None, merge=True, poster_frame=None,
+    def __init__(self,
+                 asset_d,
+                 version_name,
+                 metadata=None,
+                 keywords=None,
+                 notes=None,
+                 thumbnails=None,
+                 merge=True,
+                 poster_frame=None,
                  language="english"):
         """
         An object responsible for adding metadata to a directory. Expects a very
@@ -186,7 +194,8 @@ class Metadata(object):
                 raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
-    def get_metadata_obj_from_ver(self, version):
+    def get_metadata_obj_from_ver(self,
+                                  version):
         """
         Returns the metadata configparser object from a specific version.
 
@@ -215,7 +224,9 @@ class Metadata(object):
         return metadata_obj
 
     # --------------------------------------------------------------------------
-    def write_metadata(self, version, metadata_obj):
+    def write_metadata(self,
+                       version,
+                       metadata_obj):
         """
         Writes the metadata to disk for the version given.
 
@@ -231,7 +242,9 @@ class Metadata(object):
             metadata_obj.write(f)
 
     # --------------------------------------------------------------------------
-    def delete_metadata(self, version, keys):
+    def delete_metadata(self,
+                        version,
+                        keys):
         """
         Deletes the given metadata keys from the given version.
 
@@ -253,7 +266,9 @@ class Metadata(object):
         self.write_metadata(version, meta_obj)
 
     # --------------------------------------------------------------------------
-    def add_metadata(self, version, metadata):
+    def add_metadata(self,
+                     version,
+                     metadata):
         """
         Adds the given metadata to the given version.
 
@@ -297,7 +312,8 @@ class Metadata(object):
         self.add_metadata(self.curr_ver_n, self.metadata)
 
     # --------------------------------------------------------------------------
-    def get_keywords_from_ver(self, version):
+    def get_keywords_from_ver(self,
+                              version):
         """
         Returns the keywords from the given version.
 
@@ -328,7 +344,9 @@ class Metadata(object):
         return output
 
     # --------------------------------------------------------------------------
-    def write_keywords(self, version, keywords):
+    def write_keywords(self,
+                       version,
+                       keywords):
         """
         Writes the keywords to disk for the version given.
 
@@ -347,7 +365,9 @@ class Metadata(object):
                 f.write(keyword + "\n")
 
     # --------------------------------------------------------------------------
-    def delete_keywords(self, version, keywords):
+    def delete_keywords(self,
+                        version,
+                        keywords):
         """
         Given a list of keywords, deletes them from the keywords file for the
         version given by version.
@@ -373,7 +393,9 @@ class Metadata(object):
         self.write_keywords(version, new_keywords)
 
     # --------------------------------------------------------------------------
-    def add_keywords(self, version, keywords):
+    def add_keywords(self,
+                     version,
+                     keywords):
         """
         Given a list of keywords, adds them to the keywords file for the version
         given by version.
@@ -409,7 +431,8 @@ class Metadata(object):
         self.add_keywords(self.curr_ver_n, self.keywords)
 
     # --------------------------------------------------------------------------
-    def get_notes_from_ver(self, version):
+    def get_notes_from_ver(self,
+                           version):
         """
         Returns the notes from the given version.
 
@@ -437,7 +460,9 @@ class Metadata(object):
         return output
 
     # --------------------------------------------------------------------------
-    def write_notes(self, version, notes):
+    def write_notes(self,
+                    version,
+                    notes):
         """
         Saves the notes to the metadata directory.
 
@@ -454,7 +479,10 @@ class Metadata(object):
             f.write(notes + "\n")
 
     # --------------------------------------------------------------------------
-    def add_notes(self, version, notes, append=True):
+    def add_notes(self,
+                  version,
+                  notes,
+                  append=True):
         """
         Given notes, adds them to the notes file for the version given by
         version.
@@ -489,7 +517,9 @@ class Metadata(object):
         self.add_notes(self.curr_ver_n, self.notes)
 
     # --------------------------------------------------------------------------
-    def set_poster(self, version, frame):
+    def set_poster(self,
+                   version,
+                   frame):
         """
         Given and version and a frame number, creates a symlink named
         "poster.ext" that points to the frame given as poster_source (where ext
@@ -568,7 +598,8 @@ class Metadata(object):
                 raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
-    def delete_thumbnails(self, version):
+    def delete_thumbnails(self,
+                          version):
         """
         Deletes the thumbnails from the version given. Only removes the links,
         but leaves the source files in place. Does no evaluation to see if this
@@ -589,7 +620,10 @@ class Metadata(object):
                 os.unlink(lnk)
 
     # --------------------------------------------------------------------------
-    def add_thumbnails(self, version, thumbnails, poster_frame=None):
+    def add_thumbnails(self,
+                       version,
+                       thumbnails,
+                       poster_frame=None):
         """
         Adds thumbnails to the version passed.
 
