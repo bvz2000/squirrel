@@ -31,6 +31,7 @@ from shared import envvars
 from shared.squirrelerror import SquirrelError
 
 
+# ==============================================================================
 class Name(object):
     """
     A class responsible for managing and validating a name.
@@ -48,21 +49,16 @@ class Name(object):
 
     # --------------------------------------------------------------------------
     def __init__(self,
-                 name,
-                 repo_n = None,
                  language="english"):
         """
         Init.
 
-        :param name: The name of the asset we are validating.
-        :param repo_n: The name of the repo we are validating against. If None,
-               then the default repo will be used.
         :param language: The language to use to communicate with the user. If
                omitted, defaults to "english".
         """
 
-        self.name = name
-        self.repo_n = repo_n
+        self.name = None
+        self.repo_n = None
 
         # Read in the resources
         module_d = os.path.split(inspect.stack()[0][1])[0]
@@ -85,32 +81,25 @@ class Name(object):
 
         :return: Nothing.
         """
+        sections = dict()
+        sections["tokens"] = ["allow_uppercase", "allow_lowercase"]
+        sections["description"] = ["allow_uppercase", "allow_lowercase"]
+        sections["variant"] = ["allow_uppercase", "allow_lowercase"]
 
-        sections = ["tokens",
-                    "description",
-                    "variant",
-                    ]
-        settings = ["allow_uppercase",
-                    "allow_lowercase",
-                    ]
-
-        # Check sections
         for section in sections:
             try:
                 assert self.config_obj.has_section(section)
             except AssertionError:
-                err = self.resc.error(101)
+                err = self.resc.error(501)
                 err.msg = err.msg.format(config_p=self.config_p,
                                          section=section)
                 raise SquirrelError(err.msg, err.code)
 
-        # Check individual settings
-        for section in sections:
-            for setting in settings:
+            for setting in sections[section]:
                 try:
                     assert self.config_obj.has_option(section, setting)
                 except AssertionError:
-                    err = self.resc.error(102)
+                    err = self.resc.error(502)
                     err.msg = err.msg.format(config_p=self.config_p,
                                              setting=setting,
                                              section=section)
@@ -121,10 +110,27 @@ class Name(object):
             allow_upper = self.config_obj.getboolean(section, "allow_uppercase")
             allow_lower = self.config_obj.getboolean(section, "allow_lowercase")
             if allow_upper is False and allow_lower is False:
-                err = self.resc.error(103)
+                err = self.resc.error(503)
                 err.msg = err.msg.format(config_p=self.config_p,
                                          section=section)
                 raise SquirrelError(err.msg, err.code)
+
+    # --------------------------------------------------------------------------
+    def set_attributes(self,
+                       name=None,
+                       repo_n=None):
+        """
+        Set the attributes for this object.
+
+        :param name: The name of the asset we are validating.
+        :param repo_n: The name of the repo we are validating against. If None,
+               then the default repo will be used.
+
+        :return: Nothing.
+        """
+
+        self.name = name
+        self.repo_n = repo_n
 
     # --------------------------------------------------------------------------
     def validate_name_underscores(self):
@@ -137,6 +143,8 @@ class Name(object):
                  message if there are doubled up underscores, or if the name
                  begins or ends with an underscore.
         """
+
+        assert self.name
 
         # Error out if there are multiple underscores
         if "__" in self.name:
@@ -162,6 +170,8 @@ class Name(object):
         :return: The variant. Will raise a SquirrelError with an appropriate
                  help message if the variant does not validate.
         """
+
+        assert self.name
 
         allow_upper = self.config_obj.getboolean("variant", "allow_uppercase")
         allow_lower = self.config_obj.getboolean("variant", "allow_lowercase")
@@ -212,6 +222,9 @@ class Name(object):
 
         :return: The portion of the name that is a valid token.
         """
+
+        assert self.name
+        assert self.repo_n
 
         allow_upper = self.config_obj.getboolean("tokens", "allow_uppercase")
         allow_lower = self.config_obj.getboolean("tokens", "allow_lowercase")
@@ -290,6 +303,8 @@ class Name(object):
                  NameError if there is no description
         """
 
+        assert self.name
+
         assert self.name.startswith(token.replace("/", "_"))
         assert self.name.endswith(variant)
 
@@ -338,6 +353,9 @@ class Name(object):
                  message if the name is not properly formed.
         """
 
+        assert self.name
+        assert self.repo_n
+
         # Make sure there are no doubled up underscores
         self.validate_name_underscores()
 
@@ -361,5 +379,8 @@ class Name(object):
 
         :return: Nothing.
         """
+
+        assert self.name
+        assert self.repo_n
 
         self.extract_metadata_from_name()
