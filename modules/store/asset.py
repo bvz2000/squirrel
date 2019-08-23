@@ -37,6 +37,7 @@ import meta
 import pin
 
 
+# ==============================================================================
 class Asset(object):
     """
     Class responsible for copying source files into a versioned destination.
