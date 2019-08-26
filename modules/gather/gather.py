@@ -20,8 +20,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from __future__ import print_function
+
+import inspect
 import os.path
 import shutil
+
+from bvzlib import resources
 
 import remap
 
@@ -49,7 +54,8 @@ class Gather(object):
                  padding=None,
                  udim_identifier=None,
                  strict_udim_format=True,
-                 match_hash_length=False):
+                 match_hash_length=False,
+                 language="english"):
         """
         :param files: A list of file paths to be gathered. Note that these can
                also be in the format of a sequence, contain sequence identifiers
@@ -86,7 +92,13 @@ class Gather(object):
                any sequence number, no matter how long, would match. If the
                sequence identifier is in the printf format, this argument is
                ignored.
+        :param language: The language used for communication with the end user.
+               Defaults to "english".
         """
+
+        module_d = os.path.split(inspect.stack()[0][1])[0]
+        resources_d = os.path.join(module_d, "..", "..", "resources")
+        self.resc = resources.Resources(resources_d, "lib_gather", language)
 
         self.files = files
         self.dest = dest
@@ -134,29 +146,80 @@ class Gather(object):
             self.remapped[remap_obj.source_p] = remap_obj.target_p
 
     # --------------------------------------------------------------------------
-    def copy_files(self):
+    def has_missing(self):
+        """
+        If any of the remapped file objects have missing files, returns True.
+
+        :return: True of any of the remap objects have missing files.
+        """
+
+        for remap_obj in self.remap_objs:
+            if remap_obj.missing:
+                return True
+        return False
+
+    # --------------------------------------------------------------------------
+    def has_files_to_copy(self):
+        """
+        If any of the remapped file objects have files, returns True.
+
+        :return: True of any of the remap objects have files.
+        """
+
+        for remap_obj in self.remap_objs:
+            if remap_obj.mapping:
+                return True
+        return False
+
+    # --------------------------------------------------------------------------
+    def copy_files(self, verbose=False):
         """
         Steps through the remap objects list and copies files from the source to
         the destination. Skips any files that might be overwritten (by this
         point, those are to be skipped by default because they are known to be
         identical files).
 
+        :param verbose: Iff True, then the copying will be printed out to
+               stdout. Defaults to False.
+
         :return: Nothing.
         """
 
         for remap_obj in self.remap_objs:
 
-            parent_p = os.path.split(remap_obj.target_p)[0]
-            if not os.path.exists(parent_p):
-                os.makedirs(parent_p)
+            if remap_obj.mapping:
 
-            for actual_source_p in remap_obj.mapping:
+                parent_p = os.path.split(remap_obj.target_p)[0]
+                if not os.path.exists(parent_p):
+                    os.makedirs(parent_p)
 
-                copy_source_p = actual_source_p
-                copy_target_p = remap_obj.mapping[actual_source_p]
+                for actual_source_p in remap_obj.mapping:
 
-                if not os.path.exists(copy_target_p):
-                    shutil.copyfile(copy_source_p, copy_target_p)
+                    copy_source_p = actual_source_p
+                    copy_target_p = remap_obj.mapping[actual_source_p]
+
+                    if not os.path.exists(copy_target_p):
+
+                        if verbose:
+
+                            from_msg = self.resc.message("from")
+                            from_msg = from_msg.format(file=copy_source_p)
+                            to_msg = self.resc.message("to")
+                            to_msg = to_msg.format(file=copy_target_p)
+
+                            print(from_msg)
+                            print(to_msg, "\n")
+
+                        shutil.copyfile(copy_source_p, copy_target_p)
+
+                    else:
+
+                        if verbose:
+
+                            skip_msg = self.resc.message("skip")
+                            skip_msg = skip_msg.format(file=copy_source_p)
+
+                            print(skip_msg, "\n")
 
     # --------------------------------------------------------------------------
     def cull_file(self,
@@ -200,6 +263,3 @@ class Gather(object):
 
         self.remap_files()
         self.copy_files()
-
-        #for remap_obj in self.remap_objs:
-        #    self.remapped[remap_obj.source_p] = remap_obj.target_p

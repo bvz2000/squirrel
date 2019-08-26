@@ -29,19 +29,22 @@ import os
 import re
 import sys
 
-from bvzlib import filesystem
+from bvzlib import framespec
 from bvzlib import options
 from bvzlib import resources
 
-from store import meta
-from store import asset
+from librarian import librarian
+from shared.squirrelerror import SquirrelError
 
 OPTIONS = [
-    "asset_path",
+    "asset_name",
+    "token",
     "version",
     "thumbnails",
     "merge",
     "poster_frame",
+    "repo",
+    "local_mode",
     "language",
 ]
 
@@ -54,63 +57,44 @@ def validate_options():
     :return: Nothing.
     """
 
-    if not os.path.exists(opts.asset_path):
-        err = resc.error(100)
-        err.msg = err.msg.format(asset_path=opts.asset_path)
-        print(err.msg)
-        sys.exit(100)
-
-    if not os.path.exists(os.path.join(opts.asset_path, ".asset")):
-        err = resc.error(101)
-        err.msg = err.msg.format(asset_path=opts.asset_path)
-        print(err.msg)
-        sys.exit(101)
-
     pattern = "v[0-9][0-9][0-9][0-9]"
-    result = re.match(pattern, opts.version)
-    if not result:
-        err = resc.error(102)
-        err.msg = err.msg.format(version=opts.version)
-        print(err.msg)
+    match = re.match(pattern, opts.version)
+    if not match:
+        error = resc.error(102)
+        error.msg = error.msg.format(version=opts.version)
+        print(error.msg)
         sys.exit(102)
 
-    if not os.path.exists(os.path.join(opts.asset_path, opts.version)):
-        err = resc.error(103)
-        err.msg = err.msg.format(version=opts.version,
-                                 asset_path=opts.asset_path)
-        print(err.msg)
-        sys.exit(103)
-
     if not opts.thumbnails and not opts.poster_frame:
-        msg = resc.message("nothing_to_do")
-        print(msg)
+        message = resc.message("nothing_to_do")
+        print(message)
         sys.exit(0)
 
     # Thumbnails must exist
     if opts.thumbnails:
         for thumbnail_file in opts.thumbnails:
             if not os.path.exists(thumbnail_file):
-                err = resc.error(104)
-                err.msg = err.msg.format(thumbnail_file=thumbnail_file)
-                print(err.msg)
+                error = resc.error(104)
+                error.msg = error.msg.format(thumbnail_file=thumbnail_file)
+                print(error.msg)
                 sys.exit(104)
 
     # Thumbnails must be named correctly
     if opts.thumbnails:
-        pattern = name + "\.[0-9]+\..+"
+        pattern = opts.asset_name + "\.[0-9]+\..+"
         for thumbnail_file in opts.thumbnails:
             thumbnail_file = os.path.split(thumbnail_file)[1]
             results = re.match(pattern, thumbnail_file)
             if not results:
-                err = resc.error(105)
-                err.msg = err.msg.format(name=name,
-                                         thumbnail_file=thumbnail_file)
-                print(err.msg)
+                error = resc.error(105)
+                error.msg = error.msg.format(name=opts.asset_name,
+                                             thumbnail_file=thumbnail_file)
+                print(error.msg)
                 sys.exit(105)
 
     # Poster frame must exist
     if opts.thumbnails and opts.poster_frame:
-        pattern = name + "\." + str(opts.poster_frame) + "\..+"
+        pattern = opts.asset_name + "\." + str(opts.poster_frame) + "\..+"
         found = False
         for thumbnail_file in opts.thumbnails:
             thumbnail_file = os.path.split(thumbnail_file)[1]
@@ -119,9 +103,9 @@ def validate_options():
                 found = True
                 break
         if not found:
-            err = resc.error(106)
-            err.msg = err.msg.format(frame=str(opts.poster_frame))
-            print(err.msg)
+            error = resc.error(106)
+            error.msg = error.msg.format(frame=str(opts.poster_frame))
+            print(error.msg)
             sys.exit(106)
 
 
@@ -144,36 +128,93 @@ if __name__ == "__main__":
     # Create and initialize the options object
     try:
         opts_obj = options.Options(OPTIONS, resc, sys.argv[1:], language)
-    except ValueError as error:
-        print(error)
+    except ValueError as e:
+        print(e)
         sys.exit()
 
     opts = opts_obj.opts
     sys.argv = opts_obj.args
 
-    # If no version was given, get the highest version
-    parent_d, name = os.path.split(opts.asset_path)
-    if not opts.version:
-        asset_obj = asset.Asset(name, parent_d)
-        opts.version = asset_obj.get_highest_ver()
-
-    # If there are thumbnails, get a list of those files from the spec provided.
     if opts.thumbnails:
-        opts.thumbnails = filesystem.expand_frame_spec(opts.thumbnails)
+
+        thumbnails_dir = os.path.split(opts.thumbnails)[0]
+        if not os.path.exists(thumbnails_dir):
+            err = resc.error(107)
+            err.msg = err.msg.format(thumbnail_dir=thumbnails_dir)
+            print(err.msg)
+            sys.exit(107)
+        opts.thumbnails, missing = framespec.expand_files(opts.thumbnails)
+
     else:
-        opts.thumbnails = None
 
-    # Validate the inputs
-    validate_options()
+        opts.thumbnails = list()
+        missing = list()
 
-    meta_obj = meta.Metadata(opts.asset_path, opts.version, opts.language)
+    if missing:
+        msg = resc.message("missing")
+        msg = msg.format(range=", ".join(missing))
+        result = None
+        while not result:
+            result = raw_input(msg)
+            if result.upper() in ["N", "Q"]:
+                sys.exit(0)
+            if result.upper() not in ["Y", "C"]:
+                msg = resc.message("missing_re_enter")
+                result = None
 
-    if opts.thumbnails:
-        if opts.nomerge:
-            meta_obj.delete_thumbnails(opts.version)
-        meta_obj.add_thumbnails(opts.version,
-                                opts.thumbnails,
-                                opts.poster_frame)
+    try:
 
-    if not opts.thumbnails and opts.poster_frame:
-        meta_obj.set_poster(opts.version, opts.poster_frame)
+        librarian = librarian.Librarian(opts.language)
+
+        if opts.local_mode:
+
+            asset_parent_p = opts.token
+
+        else:
+
+            asset_parent_p = librarian.get_publish_loc(opts.token, opts.repo)
+
+        # If no version was given, get the highest version
+        if not opts.version:
+            opts.version = librarian.get_highest_version(
+                asset_parent_p,
+                opts.asset_name,
+                opts.local_mode)
+
+        if not librarian.version_exists(asset_parent_p,
+                                        opts.asset_name,
+                                        opts.version,
+                                        opts.local_mode):
+            err = resc.error(103)
+            err.msg = err.msg.format(version=opts.version,
+                                     asset_path=opts.asset_name)
+            print(err.msg)
+            sys.exit(103)
+
+        validate_options()
+
+        if opts.thumbnails:
+
+            if opts.nomerge:
+                librarian.delete_thumbnails(asset_parent_p,
+                                            opts.asset_name,
+                                            opts.version,
+                                            opts.local_mode)
+
+            librarian.add_thumbnails(asset_parent_p,
+                                     opts.asset_name,
+                                     opts.version,
+                                     opts.thumbnails,
+                                     opts.poster_frame,
+                                     opts.local_mode)
+
+        if not opts.thumbnails and opts.poster_frame:
+            librarian.set_poster_frame(asset_parent_p,
+                                       opts.asset_name,
+                                       opts.version,
+                                       opts.poster_frame,
+                                       opts.local_mode)
+
+    except SquirrelError as e:
+        print(e.message)
+        sys.exit(e.errno)

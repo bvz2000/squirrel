@@ -117,7 +117,7 @@ That is it.  From here, you can use the command: "squirrel -h" to get a list of
 options. Each option has its own help. So, for example, if you wanted to get
 help on publishing, you would issue the command:
 
-squirre publish -h
+squirrel publish -h
 
 
 USAGE
@@ -125,3 +125,23 @@ USAGE
 
 ARCHITECTURE
 --------------------------------------------------------------------------------
+
+TO DO
+--------------------------------------------------------------------------------
+I am rapidly approaching the alpha release.
+
+Here are a few notes for my own use:
+
+make store create symlinks to the current metadata dir, and have that move when
+CURRENT gets moved. Same with LATEST.
+
+make symlinks for each PIN that is the pin name, preceded by a dot, that points
+to the metadata dir for that pin (and gest moved/deleted when the pin does).
+
+Do a general clean up on the resources files (some may be deleted I am sure).
+
+Verify the ENV vars are all there and all work.
+
+make squirrel bin app fail better when the user enters a wrong command.
+
+make squirrel bin app auto-complete with tab.

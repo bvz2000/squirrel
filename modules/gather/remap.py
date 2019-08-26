@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import os.path
 
 from bvzlib import filesystem
+from bvzlib import framespec
 
 GATHER_MAPPING = {
     "tif": os.path.join("maps", "images"),
@@ -135,7 +136,7 @@ class Remap(object):
         self.strict_udim_format = strict_udim_format
         self.match_hash_length = match_hash_length
 
-        self.do_remapping()
+        self.missing = self.do_remapping()
 
     # --------------------------------------------------------------------------
     @property
@@ -166,9 +167,10 @@ class Remap(object):
         """
         :return: A dictionary of actual files that are remapped. The key is the
         source path. The value is the target path. If the source does not
-        contain "<UDIM>" or ".####." then this will simply be a single item.
-        However, if either of those is present, then this will contain a list of
-        expanded source files and a list of expanded destination files.
+        contain "<UDIM>" or a sequence identifier then this will simply be a
+        single item. However, if either of those is present, then this will
+        contain a list of expanded source files and a list of expanded
+        destination files.
         """
 
         return self.expanded_mapping
@@ -202,14 +204,14 @@ class Remap(object):
         target name to be the new path plus any increments to accommodate for
         collisions.
 
-        :return: Nothing.
+        :return: A list of missing frames (if any).
         """
 
-        expanded = filesystem.expand_files(self.source_p,
-                                           self.padding,
-                                           self.udim_identifier,
-                                           self.strict_udim_format,
-                                           self.match_hash_length)
+        expanded, missing = framespec.expand_files(self.source_p,
+                                                   self.padding,
+                                                   self.udim_identifier,
+                                                   self.strict_udim_format,
+                                                   self.match_hash_length)
 
         # Identify the increment number (if any is needed) before doing the
         # remap (check all files first to make sure any sequences are kept
@@ -256,3 +258,5 @@ class Remap(object):
         base, ext = os.path.splitext(self.source_p)
         remap = self.remap_file(base + copy_str + ext)
         self._target_p = self.remap_file(remap)
+
+        return missing

@@ -29,11 +29,11 @@ import re
 import shutil
 import tempfile
 
-from fe.gather import gather
+from gather import gather
 from libClarisse import libClarisse
 from publisherInterface import publisherInterface
 
-from clamError import ClamError
+from shared.squirrelerror import SquirrelError
 
 
 # ------------------------------------------------------------------------------

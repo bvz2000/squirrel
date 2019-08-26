@@ -33,13 +33,15 @@ import sys
 from bvzlib import options
 from bvzlib import resources
 
-from interface import storeinterface
+from librarian import librarian
 from shared.squirrelerror import SquirrelError
-#from store import asset
 
 OPTIONS = [
-    "asset_path",
+    "asset_name",
+    "token",
     "remove_pins",
+    "repo",
+    "local_mode",
     "language",
 ]
 
@@ -52,17 +54,7 @@ def validate_options():
     :return: Nothing.
     """
 
-    if not os.path.exists(opts.asset_path):
-        err = resc.error(100)
-        err.msg = err.msg.format(asset_path=opts.asset_path)
-        print(err.msg)
-        sys.exit(100)
-
-    if not os.path.exists(os.path.join(opts.asset_path, ".asset")):
-        err = resc.error(101)
-        err.msg = err.msg.format(asset_path=opts.asset_path)
-        print(err.msg)
-        sys.exit(101)
+    pass
 
 
 # ==============================================================================
@@ -94,10 +86,8 @@ if __name__ == "__main__":
     # Validate the inputs
     validate_options()
 
-    asset_parent_p, name = os.path.split(opts.asset_path)
-
     msg = resc.message("warning")
-    msg = msg.format(asset_name=name)
+    msg = msg.format(asset_name=opts.asset_name)
     result = None
     while not result:
         result = raw_input(msg)
@@ -109,12 +99,30 @@ if __name__ == "__main__":
 
     try:
 
-        store_interface = storeinterface.StoreInterface(
-            name=name,
-            asset_parent_d=asset_parent_p,
-            language=opts.language)
+        librarian = librarian.Librarian(opts.language)
 
-        store_interface.collapse(opts.removepins)
+        if opts.local_mode:
+
+            asset_parent_p = opts.token
+
+        else:
+
+            asset_parent_p = librarian.get_publish_loc(opts.token, opts.repo)
+
+        pins = librarian.get_pins(asset_parent_p,
+                                  opts.asset_name,
+                                  opts.local_mode)
+
+        if pins and not opts.remove_pins:
+            err = resc.error(100)
+            err.msg = err.msg.format()
+            print(err.msg)
+            sys.exit(100)
+
+        librarian.collapse(asset_parent_p,
+                           opts.asset_name,
+                           opts.remove_pins,
+                           opts.local_mode)
 
     except SquirrelError as e:
         print(e.message)

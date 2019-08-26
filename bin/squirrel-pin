@@ -34,13 +34,17 @@ import sys
 from bvzlib import options
 from bvzlib import resources
 
-from store import pin
+from librarian import librarian
+from shared.squirrelerror import SquirrelError
 
 OPTIONS = [
-    "asset_path",
+    "asset_name",
+    "token",
     "version",
     "pin_name",
-    "no_warn",
+    "repo",
+    "delete",
+    "local_mode",
     "language",
 ]
 
@@ -55,51 +59,25 @@ def validate_options():
 
     opts.pin_name = opts.pin_name.upper()
 
-    if not os.path.exists(opts.asset_path):
-        err = resc.error(100)
-        err.msg = err.msg.format(asset_path=opts.asset_path)
-        print(err.msg)
-        sys.exit(100)
-
-    if not os.path.exists(os.path.join(opts.asset_path, ".asset")):
-        err = resc.error(101)
-        err.msg = err.msg.format(asset_path=opts.asset_path)
-        print(err.msg)
-        sys.exit(101)
-
-    pattern = "v[0-9][0-9][0-9][0-9]"
-    result = re.match(pattern, opts.version)
-    if not result:
-        err = resc.error(102)
-        err.msg = err.msg.format(version=opts.version)
-        print(err.msg)
+    pattern = "^v[0-9][0-9][0-9][0-9]$"
+    matched = re.match(pattern, opts.version)
+    if not matched:
+        error = resc.error(102)
+        error.msg = error.msg.format(version=opts.version)
+        print(error.msg)
         sys.exit(102)
 
-    if not os.path.exists(os.path.join(opts.asset_path, opts.version)):
-        err = resc.error(103)
-        err.msg = err.msg.format(version=opts.version,
-                                 asset_path=opts.asset_path)
-        print(err.msg)
-        sys.exit(103)
-
     if opts.pin_name.upper() == "LATEST":
-        err = resc.error(104)
-        err.msg = err.msg.format()
-        print(err.msg)
+        error = resc.error(104)
+        error.msg = error.msg.format()
+        print(error.msg)
         sys.exit(104)
 
-    if not opts.no_warn:
-        if os.path.exists(os.path.join(opts.asset_path, opts.pin_name)):
-            msg = resc.message("pin_exists")
-            msg = msg.format(pin=opts.version, version=opts.asset_path)
-            result = None
-            while not result:
-                result = raw_input(msg)
-                if result.upper() in ["N", "Q"]:
-                    sys.exit(0)
-                if result.upper() not in ["Y", "C"]:
-                    msg = resc.message("pin_exists_re_enter")
-                    result = None
+    if re.match(pattern, opts.pin_name.lower()):
+        error = resc.error(111)
+        error.msg = error.msg.format()
+        print(error.msg)
+        sys.exit(111)
 
 
 # ==============================================================================
@@ -121,8 +99,8 @@ if __name__ == "__main__":
     # Create and initialize the options object
     try:
         opts_obj = options.Options(OPTIONS, resc, sys.argv[1:], language)
-    except ValueError as error:
-        print(error)
+    except ValueError as e:
+        print(e)
         sys.exit()
 
     opts = opts_obj.opts
@@ -131,7 +109,98 @@ if __name__ == "__main__":
     # Validate the inputs
     validate_options()
 
-    # Create the pin
-    pin_obj = pin.Pin(opts.asset_path, opts.version, opts.pin_name,
-                      opts.language)
-    pin_obj.set_pin()
+    try:
+
+        librarian = librarian.Librarian(opts.language)
+
+        if opts.local_mode:
+
+            asset_parent_p = opts.token
+
+        else:
+
+            asset_parent_p = librarian.get_publish_loc(opts.token, opts.repo)
+
+        # Does the version being pinned to exist?
+        if not librarian.version_exists(asset_parent_p,
+                                        opts.asset_name,
+                                        opts.version,
+                                        opts.local_mode):
+            err = resc.error(103)
+            err.msg = err.msg.format(version=opts.version,
+                                     asset_path=opts.asset_name)
+            print(err.msg)
+            sys.exit(103)
+
+        # Get current version of the pin (if it exists)
+        ver = librarian.get_pin_version(asset_parent_p,
+                                        opts.asset_name,
+                                        opts.pin_name,
+                                        opts.local_mode)
+
+        if not opts.delete:
+
+            # New pinned version is the same as the old one
+            if ver == opts.version:
+                sys.exit(0)
+
+            # The pin already exists, double check moving it
+            if ver:
+                msg = resc.message("pin_exists")
+                msg = msg.format(pin=opts.pin_name,
+                                 version=ver,
+                                 new_ver=opts.version)
+                result = None
+                while not result:
+                    result = raw_input(msg)
+                    if result.upper() in ["N", "Q"]:
+                        sys.exit(0)
+                    if result.upper() not in ["Y", "C"]:
+                        msg = resc.message("pin_exists_re_enter")
+                        result = None
+
+            librarian.set_pin(asset_parent_p,
+                              opts.asset_name,
+                              opts.pin_name,
+                              opts.version,
+                              opts.local_mode)
+        else:
+
+            # The version they supplied does not exist.
+            if not ver:
+                err = resc.error(109)
+                err.msg = err.msg.format(pin=opts.pin_name,
+                                         asset=opts.asset_name)
+                print(err.msg)
+                sys.exit(109)
+
+            # The version supplied doesn't match the pin's current version
+            if ver != opts.version:
+                err = resc.error(110)
+                err.msg = err.msg.format(version=opts.version,
+                                         pin=opts.pin_name,
+                                         actual_ver=ver)
+                print(err.msg)
+                sys.exit(110)
+
+            msg = resc.message("delete_confirm")
+            msg = msg.format(pin=opts.pin_name,
+                             version=opts.version,
+                             asset_name=opts.asset_name)
+            result = None
+            while not result:
+                result = raw_input(msg)
+                if result.upper() in ["N", "Q"]:
+                    sys.exit(0)
+                if result.upper() not in ["Y", "C", "D"]:
+                    msg = resc.message("delete_confirm_re_enter")
+                    result = None
+
+            librarian.remove_pin(asset_parent_p,
+                                 opts.asset_name,
+                                 opts.pin_name,
+                                 opts.local_mode)
+
+    except SquirrelError as e:
+        print(e.message)
+        sys.exit(e.errno)

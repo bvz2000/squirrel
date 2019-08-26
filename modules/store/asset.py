@@ -580,12 +580,13 @@ class Asset(object):
                     if not skip:
                         source_p = os.path.join(self.src_p, dir_d, file_n)
                         dest_p = os.path.join(dest_d, file_n)
-                        copied_p = filesystem.copy_file_deduplicated(source_p,
-                                                                dest_p,
-                                                                self.data_d,
-                                                                self.data_sizes,
-                                                                "sqv",
-                                                                4)
+                        copied_p = filesystem.copy_file_deduplicated(
+                            source_p,
+                            dest_p,
+                            self.data_d,
+                            self.data_sizes,
+                            "sqv",
+                            4)
 
                         if self.verify_copy:
                             src_md5 = filesystem.md5_for_file(source_p)
@@ -632,29 +633,267 @@ class Asset(object):
         if self.merge:
             self.merge_dir()
 
-        # Create the "CURRENT" pin
-        pin_obj = pin.Pin(self.asset_d,
-                          self.curr_ver_n,
-                          "CURRENT",
-                          self.language)
-        pin_obj.set_pin()
-
-        # Create the "LATEST" link as well
-        pin_obj = pin.Pin(self.asset_d,
-                          self.curr_ver_n,
-                          "LATEST",
-                          self.language)
-        pin_obj.set_pin()
+        # Create the "CURRENT" and "LATEST" pins
+        self.set_pin("CURRENT", self.curr_ver_n)
+        self.set_pin("LATEST", self.curr_ver_n)
 
         # Create any additional pins
         if self.pins:
             for pin_name in self.pins:
                 if pin_name.upper() not in ["CURRENT", "LATEST"]:
-                    pin_obj = pin.Pin(self.asset_d,
-                                      self.curr_ver_n,
-                                      pin_name.upper(),
-                                      self.language)
-                    pin_obj.set_pin()
+                    self.set_pin(pin_name.upper(), self.curr_ver_n)
+
+    # --------------------------------------------------------------------------
+    def add_keywords(self,
+                     version,
+                     keywords):
+        """
+        Sets the keywords for a specified version.
+
+        :param version: The version on which to set the metadata.
+        :param keywords: A list of keywords to ad.
+
+        :return:
+        """
+
+        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj.add_keywords(version, keywords)
+
+    # --------------------------------------------------------------------------
+    def delete_keywords(self,
+                        version,
+                        keywords):
+        """
+        Deletes keywords for a specified version.
+
+        :param version: The version on which to set the metadata.
+        :param keywords: The list of keywords to delete.
+
+        :return:
+        """
+
+        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj.delete_keywords(version, keywords)
+
+    # --------------------------------------------------------------------------
+    def add_metadata(self,
+                     version,
+                     metadata):
+        """
+        Sets the keywords for a specified version.
+
+        :param version: The version on which to set the metadata.
+        :param metadata: A dictionary of key=value pairs to add.
+
+        :return:
+        """
+
+        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj.add_metadata(version, metadata)
+
+    # --------------------------------------------------------------------------
+    def delete_metadata(self,
+                        version,
+                        metadata):
+        """
+        Deletes keywords for a specified version.
+
+        :param version: The version on which to set the metadata.
+        :param metadata: A dictionary of keys to delete.
+
+        :return:
+        """
+
+        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj.delete_metadata(version, metadata)
+
+    # --------------------------------------------------------------------------
+    def add_notes(self,
+                  version,
+                  notes,
+                  append):
+        """
+        Sets the notes for a specified version.
+
+        :param version: The version on which to set the metadata.
+        :param notes: A string of notes to add.
+        :param append: If True, then the notes will be appended to the current
+               set of notes.
+
+        :return:
+        """
+
+        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj.add_notes(version, notes, append)
+
+    # --------------------------------------------------------------------------
+    def add_thumbnails(self,
+                       version,
+                       thumbnails,
+                       poster_frame=None):
+        """
+        Sets the thumbnails for a specified version.
+
+        :param version: The version on which to set the metadata.
+        :param thumbnails: The list of thumbnail files to add.
+        :param poster_frame: The frame number (as an integer or string that
+               evaluates to an integer) that indicates which frame of the
+               thumbnails to make the poster frame. If None, and thumbnails are
+               provided, then the first frame will be made into the poster.
+               Defaults to None.
+
+        :return:
+        """
+
+        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj.add_thumbnails(version, thumbnails, poster_frame)
+
+    # --------------------------------------------------------------------------
+    def delete_thumbnails(self,
+                          version):
+        """
+        Deletes the thumbnails from a specific version.
+
+        :param version: The version on which to set the metadata.
+
+        :return:
+        """
+
+        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj.delete_thumbnails(version)
+
+    # --------------------------------------------------------------------------
+    def set_poster_frame(self,
+                         version,
+                         poster_frame=None):
+        """
+        Sets the notes for a specified version.
+
+        :param version: The version on which to set the metadata.
+        :param poster_frame: The frame number (as an integer or string that
+               evaluates to an integer) that indicates which frame of the
+               thumbnails to make the poster frame. If None, and thumbnails are
+               provided, then the first frame will be made into the poster.
+               Defaults to None.
+
+        :return:
+        """
+        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj.set_poster(version, poster_frame)
+
+    # --------------------------------------------------------------------------
+    def set_pin(self,
+                pin_name,
+                version):
+        """
+        Sets a pin for the current asset with the name "name" to the version
+        given by "version".
+
+        :param pin_name: The name of the pin to be set.
+        :param version: The version to set the pin to.
+
+        :return: Nothing.
+        """
+
+        pin_obj = pin.Pin(self.language)
+        pin_obj.set_attributes(self.asset_d,
+                               version,
+                               pin_name)
+        pin_obj.set_pin()
+
+    # --------------------------------------------------------------------------
+    def remove_pin(self,
+                   pin_name):
+        """
+        Removes a pin fro the current asset with the name "name".
+
+        :param pin_name: The name of the pin to remove.
+
+        :return: Nothing.
+        """
+
+        pin_obj = pin.Pin(self.language)
+        pin_obj.set_attributes(self.asset_d,
+                               None,
+                               pin_name)
+        pin_obj.remove_pin()
+
+    # --------------------------------------------------------------------------
+    def pin_exists(self,
+                   pin_name):
+        """
+        Returns True if a pin exists.
+
+        :param pin_name: The name of the pin who's version to retrieve.
+
+        :return: True if the pin exists. False otherwise.
+        """
+
+        if self.get_pin_version(pin_name):
+            return True
+        return False
+
+    # --------------------------------------------------------------------------
+    def get_pin_version(self,
+                        pin_name):
+        """
+        Returns the version number associated with the pin: pin_name.
+
+        :param pin_name: The name of the pin who's version to retrieve.
+
+        :return: A version number.
+        """
+
+        items = os.listdir(self.asset_d)
+        for item in items:
+            test_p = os.path.join(self.asset_d, item)
+            if (item == pin_name
+                    and os.path.islink(test_p)
+                    and os.path.split(os.path.realpath(test_p))[1][0] == "v"):
+                return os.path.split(os.path.realpath(test_p))[1]
+        return None
+
+    # --------------------------------------------------------------------------
+    def get_pins(self):
+        """
+        Returns a list of all user defined pins.
+
+        :return: A list of all the (user-defined) pins in the asset.
+        """
+
+        output = list()
+        items = os.listdir(self.asset_d)
+        for item in items:
+            test_p = os.path.join(self.asset_d, item)
+            if (os.path.islink(test_p)
+                    and item != "LATEST"
+                    and item != "CURRENT"
+                    and item != ".metadata"):
+                output.append(item)
+        return output
+
+    # --------------------------------------------------------------------------
+    def version_exists(self,
+                       version):
+        """
+        Returns True if the version exists. False otherwise.
+
+        :param version: The version we are testing.
+
+        :return: True if the version exists. False otherwise.
+        """
+
+        pattern = r"^v[0-9][0-9][0-9][0-9]$"
+        if not re.match(pattern, version):
+            err = self.resc.error(111)
+            raise SquirrelError(err.msg, err.code)
+
+        items = os.listdir(self.asset_d)
+        for item in items:
+            test_p = os.path.join(self.asset_d, item)
+            if item == version and not os.path.islink(test_p):
+                return True
+        return False
 
     # --------------------------------------------------------------------------
     def invert_version_list(self, versions):
@@ -680,8 +919,9 @@ class Asset(object):
         Given a list of metadata versions, returns any metadata versions in the
         asset that is NOT in this list.
 
-        :param meta_vers: A list of metadata versions (.v#### format) to "invert"
-               (i.e. list all metadata versions in the asset minus these).
+        :param meta_vers: A list of metadata versions (.v#### format) to
+               "invert" (i.e. list all metadata versions in the asset minus
+               these).
 
         :return: A list of all metadata versions in an asset minus those passed
                  in the parameter versions.
@@ -809,17 +1049,22 @@ class Asset(object):
         del_vers_n = self.invert_version_list([keep_ver_n])
 
         if del_orphaned_pins:
+
             # Move the "CURRENT" pin to point to the latest version
-            pin_obj = pin.Pin(self.asset_d, keep_ver_n, "CURRENT",
-                              self.language)
+            pin_obj = pin.Pin(self.language)
+            pin_obj.set_attributes(self.asset_d,
+                                   keep_ver_n,
+                                   "CURRENT")
             pin_obj.set_pin()
             # Delete any other pins that may point to the deleted versions
             for del_ver_n in del_vers_n:
                 linked_pins = self.version_pins(del_ver_n)
                 if linked_pins:
                     for linked_pin in linked_pins:
-                        pin_obj = pin.Pin(self.asset_d, keep_ver_n, linked_pin,
-                                          self.language)
+                        pin_obj = pin.Pin(self.language)
+                        pin_obj.set_attributes(self.asset_d,
+                                               keep_ver_n,
+                                               linked_pin)
                         pin_obj.remove_pin()
 
         for del_ver_n in del_vers_n:

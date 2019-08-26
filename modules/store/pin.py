@@ -37,20 +37,35 @@ class Pin(object):
 
     # --------------------------------------------------------------------------
     def __init__(self,
-                 asset_d,
-                 version_name,
-                 pin_name,
                  language="english"):
         """
         An object responsible for managing pins.
         """
 
-        assert os.path.exists(asset_d)
-        assert os.path.isdir(asset_d)
-
         module_d = os.path.split(inspect.stack()[0][1])[0]
         resources_d = os.path.join(module_d, "..", "..", "resources")
         self.resc = resources.Resources(resources_d, "lib_store", language)
+
+        self.pin_p = None
+        self.ver_n = None
+
+    # --------------------------------------------------------------------------
+    def set_attributes(self,
+                       asset_d,
+                       version_name,
+                       pin_name):
+        """
+        Sets the object attributes.
+
+        :param asset_d: The full directory of the asset
+        :param version_name: The version that the pin associates with
+        :param pin_name: The name of the pin
+
+        :return: Nothing.
+        """
+
+        assert os.path.exists(asset_d)
+        assert os.path.isdir(asset_d)
 
         self.pin_p = os.path.join(asset_d, pin_name)
         self.ver_n = version_name
@@ -62,7 +77,6 @@ class Pin(object):
 
         :return: Nothing.
         """
-
         if os.path.exists(self.pin_p):
 
             if not os.path.islink(self.pin_p):

@@ -167,10 +167,10 @@ class Metadata(object):
 
         asset_name.####.ext
 
-        Where the asset_name is identical to the name of the asset_d dir, the ####
-        digits are frame numbers (required even if there is only a single file),
-        and ext is the file extension. If self.thumbnails is None, then no
-        thumbnails will be stored (but any previously stored will be carried
+        Where the asset_name is identical to the name of the asset_d dir, the
+        #### digits are frame numbers (required even if there is only a single
+        file), and ext is the file extension. If self.thumbnails is None, then
+        no thumbnails will be stored (but any previously stored will be carried
         forward from the previous version as symlinks).
 
         Raises a SquirrelError if the thumbnails do not validate.

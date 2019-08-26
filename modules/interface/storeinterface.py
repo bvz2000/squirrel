@@ -19,6 +19,7 @@ class StoreInterface(object):
     def __init__(self,
                  language="english"):
 
+        self.language = language
         self.asset_obj = asset.Asset(language=language)
 
     # --------------------------------------------------------------------------
@@ -65,3 +66,86 @@ class StoreInterface(object):
     def collapse(self,
                  del_orphaned_pins):
         self.asset_obj.collapse(del_orphaned_pins)
+
+    # --------------------------------------------------------------------------
+    def set_pin(self,
+                pin_name,
+                version):
+        self.asset_obj.set_pin(pin_name, version)
+
+    # --------------------------------------------------------------------------
+    def remove_pin(self,
+                   pin_name):
+        self.asset_obj.remove_pin(pin_name)
+
+    # --------------------------------------------------------------------------
+    def pin_exists(self,
+                   pin_name):
+        return self.asset_obj.pin_exists(pin_name)
+
+    # --------------------------------------------------------------------------
+    def get_pin_version(self,
+                        pin_name):
+        return self.asset_obj.get_pin_version(pin_name)
+
+    # --------------------------------------------------------------------------
+    def version_exists(self,
+                       version):
+        return self.asset_obj.version_exists(version)
+
+    # --------------------------------------------------------------------------
+    def get_pins(self):
+        return self.asset_obj.get_pins()
+
+    # --------------------------------------------------------------------------
+    def get_highest_ver(self):
+        return self.asset_obj.get_highest_ver()
+
+    # --------------------------------------------------------------------------
+    def add_keywords(self,
+                     version,
+                     keywords):
+        return self.asset_obj.add_keywords(version, keywords)
+
+    # --------------------------------------------------------------------------
+    def delete_keywords(self,
+                        version,
+                        keywords):
+        return self.asset_obj.delete_keywords(version, keywords)
+
+    # --------------------------------------------------------------------------
+    def add_metadata(self,
+                     version,
+                     metadata):
+        return self.asset_obj.add_metadata(version, metadata)
+
+    # --------------------------------------------------------------------------
+    def delete_metadata(self,
+                        version,
+                        metadata):
+        return self.asset_obj.delete_metadata(version, metadata)
+
+    # --------------------------------------------------------------------------
+    def add_notes(self,
+                  version,
+                  notes,
+                  append):
+        return self.asset_obj.add_notes(version, notes, append)
+
+    # --------------------------------------------------------------------------
+    def add_thumbnails(self,
+                       version,
+                       thumbnails,
+                       poster_frame=None):
+        self.asset_obj.add_thumbnails(version, thumbnails, poster_frame)
+
+    # --------------------------------------------------------------------------
+    def delete_thumbnails(self,
+                          version):
+        self.asset_obj.delete_thumbnails(version)
+
+    # --------------------------------------------------------------------------
+    def set_poster_frame(self,
+                         version,
+                         poster_frame=None):
+        self.asset_obj.set_poster_frame(version, poster_frame)

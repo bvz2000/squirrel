@@ -31,8 +31,8 @@ import sys
 from bvzlib import options
 from bvzlib import resources
 
-from fe.gather import gather
-from librarian import librarianclient
+from gather import gather
+from librarian import librarian
 from shared.squirrelerror import SquirrelError
 
 
@@ -44,6 +44,7 @@ OPTIONS = [
     "loose_udim_format",
     "padding",
     "match_hash_length",
+    "ignore_missing",
     "skip_published",
     "repo",
 ]
@@ -62,14 +63,6 @@ def validate_options():
         err.msg = err.msg.format()
         print(err.msg)
         sys.exit(100)
-
-    # None of the source files may be directories
-    for item in opts.source:
-        if os.path.isdir(item):
-            err = resc.error(104)
-            err.msg = err.msg.format(path=item)
-            print(err.msg)
-            sys.exit(104)
 
     # Dest directory must exist
     if not os.path.exists(opts.destination):
@@ -117,11 +110,17 @@ if __name__ == "__main__":
 
     if opts.mapping:
         mapping = dict()
-        for item in opts.mapping:
-            key, value = item.split("=")
+        for item_map in opts.mapping:
+            key, value = item_map.split("=")
             mapping[key.strip()] = value.strip()
     else:
         mapping = None
+
+    files = list()
+    for source_p in opts.source:
+        if not os.path.isdir(os.path.abspath(source_p)):
+            files.append(os.path.abspath(source_p))
+    opts.source = files
 
     # Validate the inputs
     validate_options()
@@ -129,15 +128,28 @@ if __name__ == "__main__":
     try:
 
         # Gather the sources
-        gather_obj = gather.Gather(files=opts.source,
-                                   dest=opts.destination,
-                                   mapping=mapping,
-                                   padding=opts.padding,
-                                   udim_identifier=opts.udim_identifier,
-                                   strict_udim_format=not opts.loose_udim_format,
-                                   match_hash_length=opts.match_hash_length)
+        gather_obj = gather.Gather(
+            files=opts.source,
+            dest=opts.destination,
+            mapping=mapping,
+            padding=opts.padding,
+            udim_identifier=opts.udim_identifier,
+            strict_udim_format=not opts.loose_udim_format,
+            match_hash_length=opts.match_hash_length)
 
         gather_obj.remap_files()
+
+        if gather_obj.has_missing() and not opts.ignore_missing:
+            error = resc.error(105)
+            error.msg = error.msg.format()
+            print(error.msg)
+            sys.exit(105)
+
+        if not gather_obj.has_files_to_copy():
+            error = resc.error(106)
+            error.msg = error.msg.format()
+            print(error.msg)
+            sys.exit(106)
 
         if opts.skip_published:
 
@@ -148,7 +160,7 @@ if __name__ == "__main__":
                 repo_names = opts.repo
                 check_all_repos = False
 
-            librarian = librarianclient.LibrarianClient()
+            librarian = librarian.Librarian()
 
             files_to_cull = list()
             for source_p in gather_obj.remapped:
@@ -163,12 +175,7 @@ if __name__ == "__main__":
         if len(gather_obj.remapped) > 0:
             msg = resc.message("copy_header")
             print(msg)
-            for source_p in gather_obj.remapped:
-                msg = resc.message("copy")
-                msg = msg.format(source=source_p,
-                                 dest=gather_obj.remapped[source_p])
-                print(msg)
-            gather_obj.copy_files()
+            gather_obj.copy_files(verbose=True)
         else:
             msg = resc.message("nothing_to_copy")
             print(msg)
