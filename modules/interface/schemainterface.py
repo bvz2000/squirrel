@@ -30,13 +30,41 @@ class SchemaInterface(object):
         self.repo_manager_obj = manager.RepoManager(language)
 
     # --------------------------------------------------------------------------
+    def list_repos(self):
+        return self.repo_manager_obj.list_repos()
+
+    # --------------------------------------------------------------------------
+    def list_broken_repos(self):
+        return self.repo_manager_obj.list_broken_repos()
+
+    # --------------------------------------------------------------------------
     def get_default_repo(self):
         return self.repo_manager_obj.default_repo
 
     # --------------------------------------------------------------------------
+    def set_default_repo(self,
+                         repo_n):
+        self.repo_manager_obj.set_default_repo(repo_n)
+
+    # --------------------------------------------------------------------------
+    def get_repo_root(self,
+                      repo_n):
+        return self.repo_manager_obj.get_repo_root(repo_n)
+
+    # --------------------------------------------------------------------------
     def repo_name_is_valid(self,
-                           repo_name):
-        return self.repo_manager_obj.repo_name_is_valid(repo_name)
+                           repo_n):
+        return self.repo_manager_obj.repo_name_is_valid(repo_n)
+
+    # --------------------------------------------------------------------------
+    def remove_repo_from_config(self,
+                                repo_n):
+        self.repo_manager_obj.remove_repo_from_config(repo_n)
+
+    # --------------------------------------------------------------------------
+    def add_repo_to_config(self,
+                           repo_p):
+        self.repo_manager_obj.add_repo_to_config(repo_p)
 
     # --------------------------------------------------------------------------
     def file_is_within_repo(self,
@@ -74,3 +102,23 @@ class SchemaInterface(object):
                       token,
                       repo):
         return self.repo_manager_obj.token_is_leaf(token, repo)
+
+    # --------------------------------------------------------------------------
+    def bless_tree(self,
+                   tree_p,
+                   repo_n):
+        self.repo_manager_obj.bless_tree(tree_p, repo_n)
+
+    # --------------------------------------------------------------------------
+    def bless_root(self,
+                   dir_p,
+                   root_p,
+                   repo_n):
+        self.repo_manager_obj.bless_dir(dir_p,
+                                        root_p,
+                                        repo_n)
+
+    # --------------------------------------------------------------------------
+    def bless_dir(self,
+                  dir_p):
+        self.repo_manager_obj.bless_dir(dir_p)

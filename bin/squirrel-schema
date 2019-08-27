@@ -1,6 +1,5 @@
 #! /usr/bin/env python2
 
-# TODO: Add scan feature
 """
 License
 --------------------------------------------------------------------------------
@@ -32,7 +31,7 @@ import sys
 from bvzlib import options
 from bvzlib import resources
 
-from schema import manager
+from interface import schemainterface
 
 from shared.squirrelerror import SquirrelError
 
@@ -43,7 +42,7 @@ OPTIONS = [
     "set_default",
     "add_repository",
     "remove_repository",
-    "scan_for_repositories",
+#    "scan_for_repositories",
     "bless_tree",
     "bless_root",
     "bless_dir",
@@ -145,83 +144,72 @@ if __name__ == "__main__":
     # Validate the inputs
     validate_options()
 
-    repo_manager_obj = manager.RepoManager(language)
+    try:
 
-    if opts.list_repos:
+        schema_interface = schemainterface.SchemaInterface(language)
 
-        repos = list()
-        broken_repos = list()
-        default_repo = ""
+        if opts.list_repos:
 
-        name_len = 0
-        for repo in repo_manager_obj.repos.keys():
-            repos.append(repo)
-            name_len = max(len(repo), name_len)
+            default_repo = ""
 
-        broken_repos = repo_manager_obj.list_broken_repos()
-        for repo in broken_repos:
-            name_len = max(len(repo[0]), name_len)
+            repos = schema_interface.list_repos()
+            name_len = 0
+            for repo in repos:
+                name_len = max(len(repo), name_len)
 
-        default_repo = repo_manager_obj.get_default_repo()
+            broken_repos = schema_interface.list_broken_repos()
+            for repo in broken_repos:
+                name_len = max(len(repo[0]), name_len)
 
-        for repo in repo_manager_obj.repos.keys():
-            prefix = options.BRIGHT_GREEN + "  VALID:" + options.ENDC
-            if repo == default_repo:
-                prefix = options.BRIGHT_CYAN + "DEFAULT:" + options.ENDC
-            print(prefix,
-                  repo.rjust(name_len),
-                  "->",
-                  repo_manager_obj.repos[repo].repo_root_d)
+            default_repo = schema_interface.get_default_repo()
 
-        for repo in broken_repos:
-            print(options.BRIGHT_RED + " BROKEN:" + options.ENDC,
-                  repo[0].rjust(name_len),
-                  "->",
-                  repo[1])
+            for repo in repos:
+                prefix = options.BRIGHT_GREEN + "  VALID:" + options.ENDC
+                if repo == default_repo:
+                    prefix = options.BRIGHT_CYAN + "DEFAULT:" + options.ENDC
+                print(prefix,
+                      repo.rjust(name_len),
+                      "->",
+                      schema_interface.get_repo_root(repo))
 
-    if opts.remove_broken_repos:
-        broken_repos = repo_manager_obj.list_broken_repos()
-        for broken_repo in broken_repos:
-            repo_manager_obj.remove_repo_from_config(broken_repo[0])
+            for repo in broken_repos:
+                print(options.BRIGHT_RED + " BROKEN:" + options.ENDC,
+                      repo[0].rjust(name_len),
+                      "->",
+                      repo[1])
 
-    if opts.set_default_repository:
-        try:
-            repo_manager_obj.set_default_repo(opts.set_default_repository)
-        except SquirrelError as err:
-            print(str(err))
-            sys.exit(err.code)
+        if opts.remove_broken_repos:
+            broken_repos = schema_interface.list_broken_repos()
+            for broken_repo in broken_repos:
+                schema_interface.remove_repo_from_config(broken_repo[0])
 
-    if opts.remove_repository:
-        repo_manager_obj.remove_repo_from_config(opts.remove_repository)
+        if opts.set_default_repository:
+            try:
+                schema_interface.set_default_repo(opts.set_default_repository)
+            except SquirrelError as err:
+                print(str(err))
+                sys.exit(err.code)
 
-    if opts.add_repository:
-        opts.add_repository = os.path.abspath(opts.add_repository)
-        try:
-            repo_manager_obj.add_repo_to_config(opts.add_repository)
-        except SquirrelError as err:
-            print(str(err))
-            sys.exit(err.code)
+        if opts.remove_repository:
+            schema_interface.remove_repo_from_config(opts.remove_repository)
 
-    if opts.bless_tree:
-        try:
-            repo_manager_obj = manager.RepoManager(language)
-            repo_manager_obj.bless_tree(opts.bless_tree, opts.name)
-        except SquirrelError as err:
-            print(str(err))
-            sys.exit(err.code)
+        if opts.add_repository:
+            opts.add_repository = os.path.abspath(opts.add_repository)
+            try:
+                schema_interface.add_repo_to_config(opts.add_repository)
+            except SquirrelError as err:
+                print(str(err))
+                sys.exit(err.code)
 
-    if opts.bless_root:
-        try:
-            repo_manager_obj = manager.RepoManager(language)
-            repo_manager_obj.bless_dir(opts.bless_root, True, opts.name)
-        except SquirrelError as err:
-            print(str(err))
-            sys.exit(err.code)
+        if opts.bless_tree:
+            schema_interface.bless_tree(opts.bless_tree, opts.name)
 
-    if opts.bless_dir:
-        try:
-            repo_manager_obj = manager.RepoManager(language)
-            repo_manager_obj.bless_dir(opts.bless_dir)
-        except SquirrelError as err:
-            print(str(err))
-            sys.exit(err.code)
+        if opts.bless_root:
+            schema_interface.bless_root(opts.bless_root, True, opts.name)
+
+        if opts.bless_dir:
+            schema_interface.bless_dir(opts.bless_dir)
+
+    except SquirrelError as e:
+        print(e.message)
+        sys.exit(e.errno)

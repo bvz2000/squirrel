@@ -120,11 +120,114 @@ help on publishing, you would issue the command:
 squirrel publish -h
 
 
-USAGE
---------------------------------------------------------------------------------
 
 ARCHITECTURE
 --------------------------------------------------------------------------------
+![image](https://user-images.githubusercontent.com/31168744/63748777-da82d880-c85e-11e9-9730-ad3aaf7a0448.png)
+
+Squirrel consists of a few basic parts.
+
+On the back end, there are several packages:
+
+schema: Manages the structure of the "database" that organizes down to the
+asset level, but does not manage the internal structure of an asset. These
+structures are known as "repos".
+
+store: Manages the internal structure of an asset, including all metadata,
+versioning, and deduplication.
+
+name: Helper to convert strings to locations in the repo.
+
+On the front end there are the DCC applications as well as a number of command
+line tools:
+
+squirrel-env
+squirrel-collapse
+squirrel-gather
+squirrel-keyword
+squirrel-metadata
+squirrel-notes
+squirrel-pin
+squirrel-thumbnail
+squirrel-publish
+squirrel-store
+squirrel-schema
+
+With the exception of squirrel-schema and squirrel-env, each of these front-end
+tools communicates with a thin layer called the "librarian".
+
+The librarian's sole purpose to to either communicate with a second instance of
+itself, but located on a remote server OR to communicate with the interface
+layer on the local machine. Note: currently only the local mode is functional.
+
+The interface layer is another thin layer who's sole purpose is to separate the
+individual packages from each other so as to allow a (relatively) painless
+substitution of different back end packages. For example, the schema could be
+swapped out for a custom schema at a particular studio, and the only modifications
+to Squirrel would happen in the interface layer. The rest of the tool would not
+need to be modified in any way.
+
+QUICK START
+-
+A basic primer on how to use Squirrel involves first creating one or more repos
+to store data.
+
+A repo is nothing more than a directory structure somewhere on disk. An example
+would be:
+
+```
+repo
+    asset
+       bldg
+       veh
+       char
+       prop
+    material
+       bldg
+       veh
+       char
+       prop
+    hdri
+       interior
+       exterior
+```
+Once this structure has been created, it needs to be "blessed" using the squirrel-schema tool.
+Once blessed, this is now a full-fledged repository on disk. The structure of this
+repo (via the directories on disk) acts as an organizational structure for your assets.
+An asset may only exist in a single location, somewhat limiting the usefulness that you
+might get from a more database-centric asset manager. The flip side, however, is the
+absolute simplicity of this system. Assets are fully self-contained, including any and all
+metadata. Deleting an asset is as simple as deleting the directory it is in. Moving an
+asset is no more difficult than moving or copying this same directory. You can duplicate
+assets from one repo to another. You can store as many different repos on disk as you like.
+Storing a robust set of keywords and metadata can offer many of the same benefits of a more
+complicated, database controlled asset management system.
+
+The only restriction is that a repo may not exist within another repo. See the help for the squirrel-schema tool
+for more information and options when managing repos.
+
+Once a repo (or several) has been created, the most common next step would be to "gather" files together in
+preparation for publishing. Gathering files essentially makes copies of these files, no
+matter where they live on disk, into a single, structured directory. These files will be
+sorted into sub-directories within this directory based on file type. Use the squirrel-gather
+tool to accomplish this task. Note: You do NOT have to gather your files before publishing.
+You may publish any directory or single file you wish without first gathering. The only
+purpose to gathering files is that the publish does not accept more than a single path. If you have
+files that are distributed across the filesystem that you wish to have published as a single
+asset, then gather them first.
+
+Next, this directory of gathered files (or any directory or file on disk) may be published (with versioning and de-duplication)
+to the repo of your choice, using the squirrel-publish tool. Again, see the help message for
+this tool for more information. 
+
+There are also plugins that run in some DCC applications (Clarisse iFX and Maya at the moment)
+that handle much of this for you. These plugins are currently not functional, but will be
+brought online in the very near future.
+
+User Guide
+-
+Coming soon.
+
 
 TO DO
 --------------------------------------------------------------------------------

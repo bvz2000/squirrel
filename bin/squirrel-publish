@@ -29,12 +29,10 @@ import os
 import re
 import sys
 
-from bvzlib import filesystem
+from bvzlib import framespec
 from bvzlib import options
 from bvzlib import resources
 
-from interface import nameinterface
-from interface import storeinterface
 from librarian import librarian
 from shared.squirrelerror import SquirrelError
 
@@ -152,7 +150,7 @@ if __name__ == "__main__":
 
     # If there are thumbnails, get a list of those files from the spec provided.
     if opts.thumbnails:
-        opts.thumbnails = filesystem.expand_frame_spec(opts.thumbnails)
+        opts.thumbnails = framespec.expand_frame_spec(opts.thumbnails)
     else:
         opts.thumbnails = None
 

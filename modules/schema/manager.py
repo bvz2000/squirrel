@@ -160,64 +160,39 @@ class RepoManager(object):
                         print(str(e))
 
     # --------------------------------------------------------------------------
-    def list_broken_repos(self):
-        """
-        Looks through the config file and returns any repos that are broken.
-        "Broken" in this case means that the name in the config does not match
-        the name in the .repo_root file OR that the path given does not point to
-        a root directory of a repository (either it does not exist or the
-        required .repo_root file does not exist).
-
-        :return: A list of tuples containing the repo name and path of repos
-                 that are broken.
-        """
-
-        try:
-            repos = self.config_obj.items("repos")
-        except ConfigParser.NoSectionError:
-            return
-
-        broken_repos = list()
-        for repo_name, repo_path in repos:
-            if not self.repo_name_is_valid(repo_name):
-                broken_repos.append((repo_name, repo_path))
-
-        return broken_repos
-
-    # --------------------------------------------------------------------------
     def repo_name_is_valid(self,
-                           repo_name):
+                           repo_n):
         """
         Given a repo name, does a very minimal check to see if the repo is
         valid. Basically checks to see if the name is in the list of loaded
         repos. Since only valid repos will be loaded, if the name is not there,
         it isn't a valid repo.
 
-        :param repo_name: The name of the repo we are testing.
+        :param repo_n: The name of the repo we are testing.
 
         :return: True if the repo is valid. False otherwise.
         """
-        return repo_name in self.repos.keys()
+        return repo_n in self.repos.keys()
 
     # --------------------------------------------------------------------------
     @staticmethod
-    def repo_path_is_valid(repo_path):
+    def repo_path_is_valid(repo_p):
         """
         Given a repo path, does a very minimal check to see if the repo is
         valid. Basically checks to see if the path is a directory and whether
         there is a file in this directory named .repo_root.
 
-        :param repo_path: The path to the repo we are testing.
+        :param repo_p: The path to the repo we are testing.
 
         :return: True if the repo is valid. False otherwise.
         """
-        if not os.path.exists(repo_path):
+        if not os.path.exists(repo_p):
             return False
 
-        if not os.path.isdir(repo_path):
+        if not os.path.isdir(repo_p):
             return False
 
-        if not os.path.exists(os.path.join(repo_path, ".repo_root")):
+        if not os.path.exists(os.path.join(repo_p, ".repo_root")):
             return False
 
         return True
@@ -298,6 +273,40 @@ class RepoManager(object):
         self.remove_repo_from_config(repo_n)
 
     # --------------------------------------------------------------------------
+    def list_repos(self):
+        """
+        Returns a list containing all of the repo names.
+
+        :return: A list of repo names.
+        """
+        return self.repos.keys()
+
+    # --------------------------------------------------------------------------
+    def list_broken_repos(self):
+        """
+        Looks through the config file and returns any repos that are broken.
+        "Broken" in this case means that the name in the config does not match
+        the name in the .repo_root file OR that the path given does not point to
+        a root directory of a repository (either it does not exist or the
+        required .repo_root file does not exist).
+
+        :return: A list of tuples containing the repo name and path of repos
+                 that are broken.
+        """
+
+        try:
+            repos = self.config_obj.items("repos")
+        except ConfigParser.NoSectionError:
+            return
+
+        broken_repos = list()
+        for repo_name, repo_path in repos:
+            if not self.repo_name_is_valid(repo_name):
+                broken_repos.append((repo_name, repo_path))
+
+        return broken_repos
+
+    # --------------------------------------------------------------------------
     def get_default_repo(self):
         """
         Gets the default repository. It will first attempt to get it from the
@@ -361,10 +370,29 @@ class RepoManager(object):
         self.config_obj.save()
 
     # --------------------------------------------------------------------------
+    def get_repo_root(self,
+                      repo_n):
+        """
+        Given a repo name, return the path to the repo root.
+
+        :param repo_n: The name of the repo.
+
+        :return: A path to the root of the repo. Raises a SquirrelError if the
+                 name cannot resolve to a real repo.
+        """
+
+        try:
+            return self.repos[repo_n].repo_root_d
+        except KeyError:
+            err = self.resc.error(102)
+            err.msg = err.msg.format(repo_name=repo_n)
+            raise SquirrelError(err.msg, 102)
+
+    # --------------------------------------------------------------------------
     def bless_dir(self,
                   path_d,
                   root=False,
-                  name=None):
+                  repo_n=None):
         """
         "Blesses" a particular path to include it as part of a repository. There
         are two types of blessed directories: Root and Normal. A Root directory
@@ -379,18 +407,18 @@ class RepoManager(object):
                or an error will be raised.
         :param root: If True, then this is a root dir. Otherwise it is a normal
                structure dir.
-        :param name: If the dirtype is "Root", then a name of the repo must also
-               be included.
+        :param repo_n: If the dirtype is "Root", then a name of the repo must
+               also be included.
 
         :return: Nothing.
         """
         if root:
-            assert name is not None
+            assert repo_n is not None
             if os.path.exists(os.path.join(path_d, ".repo_root")):
                 semaphore_obj = ConfigParser.ConfigParser()
                 semaphore_obj.read(os.path.join(path_d, ".repo_root"))
-                existing_name = semaphore_obj.get("settings", "name", name)
-                if existing_name != name:
+                existing_name = semaphore_obj.get("settings", "name", repo_n)
+                if existing_name != repo_n:
                     self.remove_repo_from_config(existing_name)
 
         if not os.path.exists(path_d):
@@ -403,14 +431,14 @@ class RepoManager(object):
             err.msg = err.msg.format(dir=path_d)
             raise SquirrelError(err.msg, err.code)
 
-        if name:
-            if name in self.repos.keys():
-                existing_real_p = os.path.realpath(self.repos[name].repo_root_d)
+        if repo_n:
+            if repo_n in self.repos.keys():
+                existing_real_p = os.path.realpath(self.repos[repo_n].repo_root_d)
                 new_real_p = os.path.realpath(path_d)
                 if existing_real_p != new_real_p:
                     err = self.resc.error(601)
-                    err.msg = err.msg.format(repo=name,
-                                             path=self.repos[name].repo_root_d)
+                    err.msg = err.msg.format(repo=repo_n,
+                                             path=self.repos[repo_n].repo_root_d)
                     raise SquirrelError(err.msg, err.code)
 
         # Create a config parser and save it in the directory, removing any
@@ -429,7 +457,7 @@ class RepoManager(object):
                 raise SquirrelError(err.msg, err.code)
 
             bless_obj.add_section("settings")
-            bless_obj.set("settings", "name", name)
+            bless_obj.set("settings", "name", repo_n)
 
             semaphore_p = os.path.join(path_d, ".repo_root")
             if os.path.exists(semaphore_p):
@@ -462,7 +490,7 @@ class RepoManager(object):
     # --------------------------------------------------------------------------
     def bless_tree(self,
                    root_d,
-                   repo_name):
+                   repo_n):
         """
         Given a root directory, this will bless every sub-directory in the
         hierarchy (essentially creating a repo out of the hierarchy). If it runs
@@ -471,7 +499,7 @@ class RepoManager(object):
 
         :param root_d: The directory that will be the root of the repo. It must
                be an absolute path.
-        :param repo_name: The name of the repo we are creating.
+        :param repo_n: The name of the repo we are creating.
 
         :return: Nothing.
         """
@@ -490,7 +518,7 @@ class RepoManager(object):
         for dir_d, dirs_n, files_n in os.walk(root_d):
 
             if root:
-                self.bless_dir(dir_d, True, repo_name)
+                self.bless_dir(dir_d, True, repo_n)
                 root = False
             else:
                 self.bless_dir(dir_d, False)
@@ -569,14 +597,14 @@ class RepoManager(object):
 
     # --------------------------------------------------------------------------
     def get_repo(self,
-                 repo_name=None):
+                 repo_n=None):
         """
         Returns the repo object associated with the repo_name. Can accept a
         repo_name of None which means return the default repo. Also manages
         raising an error if no repo matches the name and/or no default repo
         is set.
 
-        :param repo_name: The name of the repo. If None, the default repo will
+        :param repo_n: The name of the repo. If None, the default repo will
                be returned. If there is no repo of this name, raises an error.
                If None, and there is no default repo, raises an error. Defaults
                to None.
@@ -584,87 +612,87 @@ class RepoManager(object):
         :return: A repo object corresponding to the name given.
         """
 
-        if not repo_name:
+        if not repo_n:
 
-            repo_name = self.get_default_repo()
+            repo_n = self.get_default_repo()
 
-            if not repo_name:
+            if not repo_n:
                 err = self.resc.error(103)
                 err.msg = err.msg.format()
                 raise SquirrelError(err.msg, err.code)
 
-        if not self.repo_name_is_valid(repo_name):
+        if not self.repo_name_is_valid(repo_n):
             err = self.resc.error(102)
-            err.msg = err.msg.format(repo_name=repo_name)
+            err.msg = err.msg.format(repo_name=repo_n)
             raise SquirrelError(err.msg, err.code)
 
-        return self.repos[repo_name]
+        return self.repos[repo_n]
 
     # --------------------------------------------------------------------------
     def get_publish_loc(self,
                         token,
-                        repo_name=None):
+                        repo_n=None):
         """
         Returns the path where files should be published to.
 
         :return: A path where files should be published to.
         """
 
-        repo_obj = self.get_repo(repo_name)
+        repo_obj = self.get_repo(repo_n)
 
         return repo_obj.get_publish_loc(token)
 
     # --------------------------------------------------------------------------
     def token_is_valid(self,
                        token,
-                       repo_name=None):
+                       repo_n=None):
         """
         Returns whether the given token is valid for the given repo.
 
         :param token: The token we are evaluating.
-        :param repo_name: The name of the repo we are validating against. If
+        :param repo_n: The name of the repo we are validating against. If
                None, then the default repo will be used.
 
         :return: A path where files should be published to.
         """
 
-        repo_obj = self.get_repo(repo_name)
+        repo_obj = self.get_repo(repo_n)
 
         return repo_obj.token_is_valid(token)
 
     # --------------------------------------------------------------------------
     def get_next_tokens(self,
                         token,
-                        repo_name=None):
+                        repo_n=None):
         """
         Given a token, returns what the next possible tokens will be.
 
         :param token: The token we are evaluating.
-        :param repo_name: The name of the repo we are validating against. If
+        :param repo_n: The name of the repo we are validating against. If
                None, then the default repo will be used.
 
         :return: A list of the next possible tokens.
         """
 
-        repo_obj = self.get_repo(repo_name)
+        repo_obj = self.get_repo(repo_n)
 
         return repo_obj.get_next_tokens(token)
 
     # --------------------------------------------------------------------------
     def token_is_leaf(self,
                       token,
-                      repo_name=None):
+                      repo_n=None):
         """
         Given a token, returns whether it evaluates all the way down to the
         leaf level.
 
         :param token: The token we are evaluating.
-        :param repo_name: The name of the repo we are validating against. If
+        :param repo_n: The name of the repo we are validating against. If
                None, then the default repo will be used.
 
         :return: True if the given token is a leaf, False otherwise.
         """
 
-        repo_obj = self.get_repo(repo_name)
+        repo_obj = self.get_repo(repo_n)
 
         return repo_obj.token_is_leaf(token)
