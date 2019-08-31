@@ -255,7 +255,8 @@ class Librarian(object):
         """
 
         if self.local_mode:
-            self.name_interface.validate_name(repo_n, item_n)
+            self.name_interface.set_attributes(item_n, repo_n)
+            self.name_interface.validate_name()
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
