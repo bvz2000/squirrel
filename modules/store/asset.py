@@ -284,7 +284,10 @@ class Asset(object):
         self.asset_d = os.path.join(asset_parent_d, self.name)
 
         self.data_d = os.path.join(self.asset_d, ".data")
-        self.data_sizes = filesystem.files_keyed_by_size(self.data_d)
+        if os.path.exists(self.data_d):
+            self.data_sizes = filesystem.dir_files_keyed_by_size(self.data_d)
+        else:
+            self.data_sizes = dict()
 
         self.thumbnail_data_d = os.path.join(self.asset_d, ".thumbnaildata")
 
@@ -539,21 +542,15 @@ class Asset(object):
         if not os.path.isdir(self.src_p):
             file_n = os.path.split(self.src_p)[1]
             if file_n not in self.skip_list_regex:
-                dest_p = os.path.join(self.curr_ver_d, file_n)
-                copied_p = filesystem.copy_file_deduplicated(self.src_p,
-                                                             dest_p,
-                                                             self.data_d,
-                                                             self.data_sizes,
-                                                             "sqv",
-                                                             4)
-                if self.verify_copy:
-                    src_md5 = filesystem.md5_for_file(self.src_p)
-                    copied_md5 = filesystem.md5_for_file(copied_p)
-                    if src_md5 != copied_md5:
-                        err = self.resc.error(110)
-                        err.msg = err.msg.format(source=self.src_p,
-                                                 copy=copied_p)
-                        raise OSError(err.msg)
+                filesystem.copy_file_deduplicated(
+                    source_p=self.src_p,
+                    dest_d=self.curr_ver_d,
+                    dest_n=file_n,
+                    data_d=self.data_d,
+                    data_sizes=self.data_sizes,
+                    ver_prefix="sqv",
+                    num_digits=4,
+                    do_verified_copy=self.verify_copy)
 
         else:
 
@@ -579,23 +576,15 @@ class Asset(object):
 
                     if not skip:
                         source_p = os.path.join(self.src_p, dir_d, file_n)
-                        dest_p = os.path.join(dest_d, file_n)
-                        copied_p = filesystem.copy_file_deduplicated(
-                            source_p,
-                            dest_p,
-                            self.data_d,
-                            self.data_sizes,
-                            "sqv",
-                            4)
-
-                        if self.verify_copy:
-                            src_md5 = filesystem.md5_for_file(source_p)
-                            copied_md5 = filesystem.md5_for_file(copied_p)
-                            if src_md5 != copied_md5:
-                                err = self.resc.error(110)
-                                err.msg = err.msg.format(source=self.src_p,
-                                                         copy=copied_p)
-                                raise OSError(err.msg)
+                        filesystem.copy_file_deduplicated(
+                            source_p=source_p,
+                            dest_d=dest_d,
+                            dest_n=file_n,
+                            data_d=self.data_d,
+                            data_sizes=self.data_sizes,
+                            ver_prefix="sqv",
+                            num_digits=4,
+                            do_verified_copy=self.verify_copy)
 
         return True
 
