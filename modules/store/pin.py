@@ -25,6 +25,7 @@ import os
 
 from bvzlib import resources
 
+from shared import libSquirrel
 from shared.squirrelerror import SquirrelError
 
 
@@ -46,8 +47,12 @@ class Pin(object):
         resources_d = os.path.join(module_d, "..", "..", "resources")
         self.resc = resources.Resources(resources_d, "lib_store", language)
 
+        self.pin_n = None
         self.pin_p = None
         self.ver_n = None
+
+        self.attr_pin_p = None
+        self.attr_ver_n = None
 
     # --------------------------------------------------------------------------
     def set_attributes(self,
@@ -66,9 +71,41 @@ class Pin(object):
 
         assert os.path.exists(asset_d)
         assert os.path.isdir(asset_d)
+        assert type(version_name) is str
+        assert type(pin_name) is str
 
+        self.pin_n = pin_name
         self.pin_p = os.path.join(asset_d, pin_name)
         self.ver_n = version_name
+
+        self.attr_pin_p = os.path.join(asset_d, "." + pin_name)
+        self.attr_ver_n = "." + version_name
+
+        self.validate_pin_name()
+
+    # --------------------------------------------------------------------------
+    def validate_pin_name(self):
+        """
+        Pin names may not be one of the following reserved names:
+
+        thumbnaildata
+        data
+        or any version number
+
+        If they are, a SquirrelError will be raised.
+
+        :return: Nothing.
+        """
+
+        if self.pin_n.upper() in ["THUMBNAILDATA", "DATA"]:
+            err = self.resc.error(113)
+            err.msg = err.msg.format(pin=os.path.split(self.pin_p)[1])
+            raise SquirrelError(err.msg, err.code)
+
+        if libSquirrel.validate_version(self.pin_n):
+            err = self.resc.error(114)
+            err.msg = err.msg.format(pin=os.path.split(self.pin_p)[1])
+            raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def remove_pin(self):
@@ -86,6 +123,15 @@ class Pin(object):
 
             os.unlink(self.pin_p)
 
+        if os.path.exists(self.attr_pin_p):
+
+            if not os.path.islink(self.attr_pin_p):
+                err = self.resc.error(112)
+                err.msg = err.msg.format(pin=self.attr_pin_p)
+                raise SquirrelError(err.msg, err.code)
+
+            os.unlink(self.attr_pin_p)
+
     # --------------------------------------------------------------------------
     def set_pin(self):
         """
@@ -97,5 +143,6 @@ class Pin(object):
         # Remove the pin if it already exists
         self.remove_pin()
 
-        # Create the pin
+        # Create the pin (and the hidden metadata pin)
         os.symlink(os.path.join(".", self.ver_n), self.pin_p)
+        os.symlink(os.path.join(".", self.attr_ver_n), self.attr_pin_p)
