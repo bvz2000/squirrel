@@ -638,7 +638,7 @@ class Metadata(object):
         :return:
         """
 
-        data_sizes = filesystem.files_keyed_by_size(self.thumbnail_data_d)
+        data_sizes = filesystem.dir_files_keyed_by_size(self.thumbnail_data_d)
 
         for source_p in thumbnails:
 
@@ -646,12 +646,13 @@ class Metadata(object):
             thumbnail_d = os.path.join(self.asset_d,
                                        "." + version,
                                        "thumbnails")
-            dest_p = os.path.join(thumbnail_d, thumbnail_n)
 
-            filesystem.copy_file_deduplicated(source_p,
-                                              dest_p,
-                                              self.thumbnail_data_d,
-                                              data_sizes)
+            filesystem.copy_file_deduplicated(source_p=source_p,
+                                              dest_d=thumbnail_d,
+                                              dest_n=thumbnail_n,
+                                              data_d=self.thumbnail_data_d,
+                                              data_sizes=data_sizes,
+                                              do_verified_copy=False)
 
         self.set_poster(version, poster_frame)
 
