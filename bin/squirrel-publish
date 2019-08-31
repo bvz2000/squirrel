@@ -161,6 +161,12 @@ if __name__ == "__main__":
         for item in opts.metadata:
             metadata[item.split("=")[0]] = item.split("=")[1]
 
+    if not opts.keywords:
+        opts.keywords = None
+
+    if not opts.poster_frame:
+        opts.poster_frame = None
+
     # Validate the inputs
     validate_options()
 
