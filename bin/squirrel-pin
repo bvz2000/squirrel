@@ -73,12 +73,6 @@ def validate_options():
         print(error.msg)
         sys.exit(104)
 
-    if re.match(pattern, opts.pin_name.lower()):
-        error = resc.error(111)
-        error.msg = error.msg.format()
-        print(error.msg)
-        sys.exit(111)
-
 
 # ==============================================================================
 if __name__ == "__main__":
