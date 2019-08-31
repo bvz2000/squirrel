@@ -40,6 +40,7 @@ from shared.squirrelerror import SquirrelError
 OPTIONS = [
     "source",
     "tag",
+    "name",
     "repo",
     "metadata",
     "keywords",
@@ -154,9 +155,6 @@ if __name__ == "__main__":
     else:
         opts.thumbnails = None
 
-    if opts.repo == "":
-        opts.repo = None
-
     # Convert metadata to a dictionary
     metadata = dict()
     if opts.metadata:
@@ -170,17 +168,22 @@ if __name__ == "__main__":
 
         librarian = librarian.Librarian(opts.language)
 
+        if not opts.repo:
+            opts.repo = librarian.get_default_repo()
+
+        if not opts.name:
+            opts.name = os.path.split(opts.source)[1]
+
         if not opts.token:
-            file_n = os.path.split(opts.source)[1]
-            librarian.validate_name(file_n, opts.repo)
-            name_metadata = librarian.extract_metadata_from_name(file_n,
+            librarian.validate_name(opts.name, opts.repo)
+            name_metadata = librarian.extract_metadata_from_name(opts.name,
                                                                  opts.repo)
             opts.token = name_metadata[0]
 
         pub_loc = librarian.get_publish_loc(opts.token, opts.repo)
 
         librarian.store(
-            name=os.path.split(opts.source)[1],
+            name=opts.name,
             asset_parent_d=pub_loc,
             src_p=opts.source,
             metadata=metadata,
