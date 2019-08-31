@@ -31,6 +31,7 @@ from bvzlib import filesystem
 from bvzlib import config
 
 from shared import envvars
+from shared import libSquirrel
 from shared.squirrelerror import SquirrelError
 
 import meta
@@ -42,17 +43,17 @@ class Asset(object):
     """
     Class responsible for copying source files into a versioned destination.
 
-    In the division of labor of the asset management, squirrel handles
+    In the division of labor of the asset management, "store" handles
     everything from the asset name down to the individual version directories.
     This includes all metadata and thumbnails stored within the asset. Once
     within a version directory, no squirrel related files will be stored (only
-    the actual files provided to squirrel by the end user).
+    the actual files provided to "store" by the end user).
 
     So, the structure looks like this:
 
     /some/dirs/that/may/be/manged/elsewhere
 
-    Within this location (which can be anywhere as far as squirrel is concerned)
+    Within this location (which can be anywhere as far as "store" is concerned)
     you will get something like this structure:
 
     asset_name
@@ -87,9 +88,17 @@ class Asset(object):
     --- <actual user files>
     - .thumbnaildata/ (directory)
     --- <actual thumbnails>
+    - CURRENT (symlink to one of the v#### directories)
+    - .CURRENT (symlink to the associated .v#### directory)
+    - LATEST (symlink to the HIGHEST v#### directory)
+    - .LATEST (symlink to the associated .v#### directory)
+
+    There may be additional, ALL_CAPS symlinks to various version directories.
+    For each of these there will also be a .ALL_CAPS hidden symlink to the
+    metadata .v#### directory.
 
     With the exception of actually copying the data to live inside the version
-    directories (actually as symlinks to the asset .data dir), squirrel only
+    directories (actually as symlinks to the asset .data dir), "store" only
     handles versioning and storing metadata, and never alters the structure
     inside a version dir.
     """
@@ -103,6 +112,8 @@ class Asset(object):
 
         :return: Nothing.
         """
+
+        assert type(language) is str
 
         module_d = os.path.split(inspect.stack()[0][1])[0]
         resources_d = os.path.join(module_d, "..", "..", "resources")
@@ -152,9 +163,7 @@ class Asset(object):
 
         # Check sections
         for section in sections:
-            try:
-                assert self.config_obj.has_section(section)
-            except AssertionError:
+            if not self.config_obj.has_section(section):
                 err = self.resc.error(501)
                 err.msg = err.msg.format(config_p=self.config_p,
                                          section=section)
@@ -162,9 +171,7 @@ class Asset(object):
 
             for setting in sections[section]:
                 if setting:
-                    try:
-                        assert self.config_obj.has_option(section, setting)
-                    except AssertionError:
+                    if not self.config_obj.has_option(section, setting):
                         err = self.resc.error(502)
                         err.msg = err.msg.format(config_p=self.config_p,
                                                  setting=setting,
@@ -265,17 +272,35 @@ class Asset(object):
                allows for multiple publishes to layer together (i.e. publish
                a model asset as version 1, and publish a material definition as
                version 2 -> The model file(s) will be carried forward to version
-               2 as though they had been explicitly published a second time).
-               Defaults to True.
+               2 as though they had been explicitly published a second time). If
+               False, then only the files provided will be a part of the asset
+               (essentially creating a "fresh" version of the asset). Defaults
+               to True.
         :param pins: A list of pins to set to point to the newly created
                version. These are in addition to the automatic "LATEST" and
-               "CURRENT".
+               "CURRENT". If None, no pins beyond the automatic pins will be
+               created. Defaults to None.
         :param verify_copy: If True, then an md5 checksum will be done on each
                source and each copy to ensure that the file was copied
                correctly. Defaults to False.
         """
 
-        assert name != ""
+        assert name and type(name) is str
+        assert os.path.exists(asset_parent_d)
+        assert os.path.isdir(asset_parent_d)
+        assert src_p is None or os.path.exists(src_p)
+        assert metadata is None or type(metadata) is dict
+        assert keywords is None or type(keywords) is list
+        if thumbnails:
+            assert type(thumbnails) is list
+            for thumbnail in thumbnails:
+                assert os.path.exists(thumbnail)
+                assert os.path.isfile(thumbnail)
+            if poster_frame:
+                assert type(poster_frame) is int
+        assert type(merge) is bool
+        assert pins is None or type(pins) is list
+        assert type(verify_copy) is bool
 
         self.src_p = src_p
         self.name = name
@@ -325,7 +350,7 @@ class Asset(object):
             return "v0000"
         
         highest = 0
-        pattern = r"(v)([0-9]*[0-9]*[0-9]*[0-9]+)"
+        pattern = r"^(v)([0-9]*[0-9]*[0-9]*[0-9]+)$"
         
         items = os.listdir(self.asset_d)
         for item in items:
@@ -408,16 +433,6 @@ class Asset(object):
                 pass
             else:
                 raise
-
-        # symlink the .metadata dir to this version's metadata dir.
-        top_metadata_d = os.path.join(self.asset_d, ".metadata")
-        if os.path.exists(top_metadata_d):
-            if os.path.islink(top_metadata_d):
-                os.unlink(top_metadata_d)
-            else:
-                err = self.resc.error(104)
-                raise SquirrelError(err.msg, err.code)
-        os.symlink("./." + self.curr_ver_n, top_metadata_d)
 
     # --------------------------------------------------------------------------
     def reserve_version(self):
@@ -604,15 +619,15 @@ class Asset(object):
         self.copy_files()
 
         # Store the metadata.
-        metadata_obj = meta.Metadata(asset_d=self.asset_d,
-                                     version_name=self.curr_ver_n,
-                                     metadata=self.metadata,
-                                     keywords=self.keywords,
-                                     notes=self.notes,
-                                     thumbnails=self.thumbnails,
-                                     merge=self.merge,
-                                     poster_frame=self.poster_frame,
-                                     language=self.language)
+        metadata_obj = meta.Metadata(self.language)
+        metadata_obj.set_attributes(asset_d=self.asset_d,
+                                    version=self.curr_ver_n,
+                                    metadata=self.metadata,
+                                    keywords=self.keywords,
+                                    notes=self.notes,
+                                    thumbnails=self.thumbnails,
+                                    merge=self.merge,
+                                    poster_frame=self.poster_frame)
         metadata_obj.save_metadata()
         metadata_obj.save_keywords()
         metadata_obj.save_notes()
@@ -645,7 +660,8 @@ class Asset(object):
         :return:
         """
 
-        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
         meta_obj.add_keywords(version, keywords)
 
     # --------------------------------------------------------------------------
@@ -661,7 +677,11 @@ class Asset(object):
         :return:
         """
 
-        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(keywords) is list
+
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
         meta_obj.delete_keywords(version, keywords)
 
     # --------------------------------------------------------------------------
@@ -677,7 +697,11 @@ class Asset(object):
         :return:
         """
 
-        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(metadata) is dict
+
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
         meta_obj.add_metadata(version, metadata)
 
     # --------------------------------------------------------------------------
@@ -693,7 +717,11 @@ class Asset(object):
         :return:
         """
 
-        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(metadata) is dict
+
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
         meta_obj.delete_metadata(version, metadata)
 
     # --------------------------------------------------------------------------
@@ -712,7 +740,12 @@ class Asset(object):
         :return:
         """
 
-        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(notes) is str
+        assert type(append) is bool
+
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
         meta_obj.add_notes(version, notes, append)
 
     # --------------------------------------------------------------------------
@@ -734,7 +767,14 @@ class Asset(object):
         :return:
         """
 
-        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(thumbnails) is list
+        for thumbnail in thumbnails:
+            assert os.path.exists(thumbnail)
+        assert poster_frame is None or type(poster_frame) is bool
+
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
         meta_obj.add_thumbnails(version, thumbnails, poster_frame)
 
     # --------------------------------------------------------------------------
@@ -748,7 +788,10 @@ class Asset(object):
         :return:
         """
 
-        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+        assert libSquirrel.validate_version(version, "v", 4)
+
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
         meta_obj.delete_thumbnails(version)
 
     # --------------------------------------------------------------------------
@@ -767,7 +810,12 @@ class Asset(object):
 
         :return:
         """
-        meta_obj = meta.Metadata(self.asset_d, version, self.language)
+
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert poster_frame is None or type(poster_frame) is bool
+
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
         meta_obj.set_poster(version, poster_frame)
 
     # --------------------------------------------------------------------------
@@ -783,6 +831,9 @@ class Asset(object):
 
         :return: Nothing.
         """
+
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(pin_name) is str
 
         pin_obj = pin.Pin(self.language)
         pin_obj.set_attributes(self.asset_d,
@@ -801,6 +852,8 @@ class Asset(object):
         :return: Nothing.
         """
 
+        assert type(pin_name) is str
+
         pin_obj = pin.Pin(self.language)
         pin_obj.set_attributes(self.asset_d,
                                None,
@@ -818,6 +871,8 @@ class Asset(object):
         :return: True if the pin exists. False otherwise.
         """
 
+        assert type(pin_name) is str
+
         if self.get_pin_version(pin_name):
             return True
         return False
@@ -832,6 +887,8 @@ class Asset(object):
 
         :return: A version number.
         """
+
+        assert type(pin_name) is str
 
         items = os.listdir(self.asset_d)
         for item in items:
@@ -856,8 +913,7 @@ class Asset(object):
             test_p = os.path.join(self.asset_d, item)
             if (os.path.islink(test_p)
                     and item != "LATEST"
-                    and item != "CURRENT"
-                    and item != ".metadata"):
+                    and item != "CURRENT"):
                 output.append(item)
         return output
 
@@ -872,8 +928,9 @@ class Asset(object):
         :return: True if the version exists. False otherwise.
         """
 
-        pattern = r"^v[0-9][0-9][0-9][0-9]$"
-        if not re.match(pattern, version):
+        assert libSquirrel.validate_version(version, "v", 4)
+
+        if not libSquirrel.validate_version(version, "v", 4):
             err = self.resc.error(111)
             raise SquirrelError(err.msg, err.code)
 
@@ -897,7 +954,11 @@ class Asset(object):
                  parameter versions.
         """
 
-        pattern = r"v[0-9][0-9][0-9][0-9]"
+        assert type(versions) is list
+        for version in versions:
+            assert libSquirrel.validate_version(version, "v", 4)
+
+        pattern = r"^v[0-9][0-9][0-9][0-9]$"
         if type(versions) != list:
             versions = [versions]
         return filesystem.invert_dir_list(self.asset_d, versions, pattern)
@@ -916,26 +977,32 @@ class Asset(object):
                  in the parameter versions.
         """
 
-        pattern = r"\.v[0-9][0-9][0-9][0-9]"
+        assert type(meta_vers) is list
+        for meta_ver in meta_vers:
+            assert libSquirrel.validate_version(meta_ver, "v", 4)
+
+        pattern = r"^\.v[0-9][0-9][0-9][0-9]$"
         if type(meta_vers) != list:
             meta_vers = [meta_vers]
         return filesystem.invert_dir_list(self.asset_d, meta_vers, pattern)
 
     # --------------------------------------------------------------------------
-    def version_pins(self, version_n):
+    def version_pins(self, version):
         """
         Returns a list of pins that point to the given version. If no pins point
         to this version, an empty list is returned.
 
-        :param version_n: The name of the version (in v#### format).
+        :param version: The name of the version (in v#### format).
 
         :return: A list of pins that point to this version. The list will be
                  empty if no pins point to the given version.
         """
 
+        assert libSquirrel.validate_version(version, "v", 4)
+
         output = list()
 
-        ver_d = os.path.join(self.asset_d, version_n)
+        ver_d = os.path.join(self.asset_d, version)
 
         psbl_pins_n = os.listdir(self.asset_d)
         for psbl_pin_n in psbl_pins_n:
@@ -947,48 +1014,50 @@ class Asset(object):
         return output
 
     # --------------------------------------------------------------------------
-    def delete_version(self, version_n):
+    def delete_version(self, version):
         """
         Deletes a single version and any files it references (as long as these
         files are not being referenced by any other version).
 
-        :param version_n: The version to delete (in the format v####).
+        :param version: The version to delete (in the format v####).
 
         :return: Nothing.
         """
 
         # TODO: Split the repetitive bits into a separate function
 
-        ver_d = os.path.join(self.asset_d, version_n)
-        meta_d = os.path.join(self.asset_d, "." + version_n)
+        assert libSquirrel.validate_version(version, "v", 4)
+
+        ver_d = os.path.join(self.asset_d, version)
+        meta_d = os.path.join(self.asset_d, "." + version)
 
         # The version path and metadata path must exist
         if not os.path.exists(ver_d):
             err = self.resc.error(100)
-            err.msg = err.msg.format(version=version_n)
+            err.msg = err.msg.format(version=version)
             raise OSError(err.msg)
 
         if not os.path.exists(meta_d):
             err = self.resc.error(101)
-            err.msg = err.msg.format(metadata="." + version_n)
+            err.msg = err.msg.format(metadata="." + version)
             raise OSError(err.msg)
 
         # Cannot delete a version if it has any pins pointing to it.
-        ver_pins_n = self.version_pins(version_n)
+        ver_pins_n = self.version_pins(version)
         if ver_pins_n:
             err = self.resc.error(102)
-            err.msg = err.msg.format(version=version_n,
+            err.msg = err.msg.format(version=version,
                                      pin=",".join(ver_pins_n))
             raise OSError(err.msg)
 
         # Get a list of all the files referenced by the other versions
-        keep_vers_n = self.invert_version_list(version_n)
+        keep_vers_n = self.invert_version_list(version)
         keep_vers_d = [os.path.join(self.asset_d, n) for n in keep_vers_n]
         keep_lnks_p = filesystem.recursively_list_files_in_dirs(keep_vers_d)
         keep_files_p = filesystem.symlinks_to_real_paths(keep_lnks_p)
 
         # Get a list of symlinks in the current version to delete
-        psbl_del_lnks_p = filesystem.recursively_list_files_in_dirs(ver_d)
+        psbl_del_lnks_p = filesystem.recursively_list_files_in_dirs([ver_d])
         psbl_del_files_p = filesystem.symlinks_to_real_paths(psbl_del_lnks_p)
 
         # Delete any that are not in the "keep" list.
@@ -998,13 +1067,13 @@ class Asset(object):
                     os.remove(psbl_del_file_p)
 
         # Get a list of all the files referenced by the other metadata
-        keep_vers_n = self.invert_metadata_list("." + version_n)
+        keep_vers_n = self.invert_metadata_list("." + version)
         keep_vers_d = [os.path.join(self.asset_d, n) for n in keep_vers_n]
         keep_lnks_p = filesystem.recursively_list_files_in_dirs(keep_vers_d)
         keep_files_p = filesystem.symlinks_to_real_paths(keep_lnks_p)
 
         # Get a list of symlinks in the current version to delete
-        psbl_del_lnks_p = filesystem.recursively_list_files_in_dirs(meta_d)
+        psbl_del_lnks_p = filesystem.recursively_list_files_in_dirs([meta_d])
         psbl_del_files_p = filesystem.symlinks_to_real_paths(psbl_del_lnks_p)
 
         # Delete any that are not in the "keep" list.
@@ -1034,6 +1103,8 @@ class Asset(object):
         :return: Nothing.
         """
 
+        assert type(del_orphaned_pins) is bool
+        
         keep_ver_n = self.get_highest_ver()
         del_vers_n = self.invert_version_list([keep_ver_n])
 
