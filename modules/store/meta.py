@@ -27,8 +27,9 @@ import re
 
 from bvzlib import filesystem
 from bvzlib import resources
-from bvzlib import general
+from bvzlib import listTools
 
+from shared import libSquirrel
 from shared.squirrelerror import SquirrelError
 
 
@@ -40,14 +41,6 @@ class Metadata(object):
 
     # --------------------------------------------------------------------------
     def __init__(self,
-                 asset_d,
-                 version_name,
-                 metadata=None,
-                 keywords=None,
-                 notes=None,
-                 thumbnails=None,
-                 merge=True,
-                 poster_frame=None,
                  language="english"):
         """
         An object responsible for adding metadata to a directory. Expects a very
@@ -66,9 +59,48 @@ class Metadata(object):
         --- thumbnails
         - .thumbnaildata
 
+        :param language: The language used for communication with the end user.
+               Defaults to "english".
+        """
+
+        assert type(language) is str
+
+        module_d = os.path.split(inspect.stack()[0][1])[0]
+        resources_d = os.path.join(module_d, "..", "..", "resources")
+        self.resc = resources.Resources(resources_d, "lib_store", language)
+
+        self.asset_n = None
+        self.asset_d = None
+        self.curr_ver_n = None
+        self.curr_ver_d = None
+        self.prev_ver_n = None
+        self.prev_ver_d = None
+        self.thumbnail_data_d = None
+        self.thumbnail_d = None
+        self.prev_thumbs_p = None
+        self.prev_keywords_p = None
+        self.prev_metadata_p = None
+        self.metadata = None
+        self.keywords = None
+        self.notes = None
+        self.thumbnails = None
+        self.merge = None
+        self.poster_frame = None
+
+    # --------------------------------------------------------------------------
+    def set_attributes(self,
+                       asset_d,
+                       version,
+                       metadata=None,
+                       keywords=None,
+                       notes=None,
+                       thumbnails=None,
+                       merge=True,
+                       poster_frame=None):
+        """
         :param asset_d: The full path to where the version metadata
                sub-directories live. This is the top-level dir of the asset.
-        :param version_name: The name of the version sub-directory we will be
+        :param version: The name of the version sub-directory we will be
                adding metadata to. This should be in the format: "v####" without
                the leading dot.
         :param metadata: A dictionary of key, value pairs that defines arbitrary
@@ -103,23 +135,31 @@ class Metadata(object):
                thumbnails to make the poster frame. If None, and thumbnails are
                provided, then the first frame will be made into the poster.
                Defaults to None.
-        :param language: The language used for communication with the end user.
-               Defaults to "english".
         """
 
-        module_d = os.path.split(inspect.stack()[0][1])[0]
-        resources_d = os.path.join(module_d, "..", "..", "resources")
-        self.resc = resources.Resources(resources_d, "lib_store", language)
+        assert os.path.exists(asset_d)
+        assert os.path.isdir(asset_d)
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert metadata is None or type(metadata) is dict
+        assert keywords is None or type(keywords) is list
+        assert notes is None or type(notes) is str
+        assert thumbnails is None or type(thumbnails) is list
+        if thumbnails:
+            for thumbnail in thumbnails:
+                assert os.path.exists(thumbnail)
+                assert os.path.isfile(thumbnail)
+        assert type(merge) is bool
+        assert poster_frame is None or type(poster_frame) is int
 
         self.asset_n = os.path.split(asset_d)[1]
         self.asset_d = asset_d
 
-        self.curr_ver_n = version_name
-        self.curr_ver_d = os.path.join(self.asset_d, "." + version_name)
+        self.curr_ver_n = version
+        self.curr_ver_d = os.path.join(self.asset_d, "." + version)
 
         self.prev_ver_n = self.get_previous_version()
         if self.prev_ver_n:
-            self.prev_ver_d = os.path.join(self.asset_d, self.prev_ver_n)
+            self.prev_ver_d = os.path.join(self.asset_d, "." + self.prev_ver_n)
         else:
             self.prev_ver_d = None
 
@@ -136,7 +176,11 @@ class Metadata(object):
             self.prev_metadata_p = None
 
         self.metadata = metadata
+
         self.keywords = keywords
+        if not self.keywords:
+            self.keywords = list()
+
         self.notes = notes
         self.thumbnails = thumbnails
         self.merge = merge
@@ -156,7 +200,7 @@ class Metadata(object):
         current = int(self.curr_ver_n.split("v")[1])
         if current <= 1:
             return None
-        return ".v" + str(current - 1).rjust(4, "0")
+        return "v" + str(current - 1).rjust(4, "0")
 
     # --------------------------------------------------------------------------
     def validate_thumbnails(self):
@@ -207,6 +251,8 @@ class Metadata(object):
                  there is no previous version, returns an empty dict.
         """
 
+        assert libSquirrel.validate_version(version, "v", 4)
+
         metadata_obj = ConfigParser.SafeConfigParser()
 
         if not version:
@@ -237,6 +283,9 @@ class Metadata(object):
         :return: Nothing.
         """
 
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert isinstance(metadata_obj, ConfigParser.SafeConfigParser)
+
         metadata_p = os.path.join(self.asset_d, "." + version, "metadata")
         with open(metadata_p, "w") as f:
             metadata_obj.write(f)
@@ -253,6 +302,9 @@ class Metadata(object):
 
         :return: Nothing.
         """
+
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(keys) is list
 
         meta_obj = self.get_metadata_obj_from_ver(version)
         if not meta_obj.has_section("metadata"):
@@ -278,6 +330,9 @@ class Metadata(object):
         :return: Nothing.
         """
 
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(metadata) is dict
+
         meta_obj = self.get_metadata_obj_from_ver(version)
         if not meta_obj.has_section("metadata"):
             meta_obj.add_section("metadata")
@@ -297,7 +352,7 @@ class Metadata(object):
         :return: Nothing.
         """
 
-        if self.merge:
+        if self.merge and self.prev_ver_n:
             prev_meta_obj = self.get_metadata_obj_from_ver(self.prev_ver_n)
             if not prev_meta_obj.has_section("metadata"):
                 prev_meta_obj.add_section("metadata")
@@ -323,6 +378,8 @@ class Metadata(object):
         :return: A list of keywords from the version given. If there are no
                  keywords, returns an empty list.
         """
+
+        assert libSquirrel.validate_version(version, "v", 4)
 
         output = list()
 
@@ -357,6 +414,9 @@ class Metadata(object):
         :return: Nothing.
         """
 
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(keywords) is list
+
         # Write the keywords to disk
         keywords.sort()
         keywords_p = os.path.join(self.asset_d, "." + version, "keywords")
@@ -377,6 +437,9 @@ class Metadata(object):
 
         :return: Nothing.
         """
+
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(keywords) is list
 
         # Get the existing keywords
         existing_keywords = self.get_keywords_from_ver(version)
@@ -406,11 +469,16 @@ class Metadata(object):
         :return: Nothing.
         """
 
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(keywords) is list
+
         # Get the existing keywords
         existing_keywords = list(set(self.get_keywords_from_ver(version)))
 
         # Merge the two sets of keywords
-        output = general.merge_lists_unique(existing_keywords, keywords, False)
+        output = listTools.merge_lists_unique(existing_keywords,
+                                              keywords,
+                                              False)
 
         # Write the keywords to disk
         self.write_keywords(version, output)
@@ -423,10 +491,10 @@ class Metadata(object):
         :return: Nothing.
         """
 
-        if self.merge:
+        if self.merge and self.prev_ver_n:
             prev_keywords = self.get_keywords_from_ver(self.prev_ver_n)
-            self.keywords = general.merge_lists_unique(prev_keywords,
-                                                       self.keywords)
+            self.keywords = listTools.merge_lists_unique(prev_keywords,
+                                                         self.keywords)
 
         self.add_keywords(self.curr_ver_n, self.keywords)
 
@@ -442,6 +510,8 @@ class Metadata(object):
         :return: A string of the notes from the version given. If there are no
                  notes, returns an empty string.
         """
+
+        assert libSquirrel.validate_version(version, "v", 4)
 
         output = ""
 
@@ -473,6 +543,9 @@ class Metadata(object):
         :return: Nothing.
         """
 
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(notes) is str
+
         # Write the keywords to disk
         notes_p = os.path.join(self.asset_d, "." + version, "notes")
         with open(notes_p, "w") as f:
@@ -495,6 +568,10 @@ class Metadata(object):
 
         :return: Nothing.
         """
+
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(notes) is str
+        assert type(append) is bool
 
         existing_notes = ""
         if append:
@@ -532,6 +609,9 @@ class Metadata(object):
 
         :return: Nothing.
         """
+
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(frame) is int
 
         ver_d = os.path.join(self.asset_d, "." + version)
         thumb_d = os.path.join(ver_d, "thumbnails")
@@ -611,6 +691,8 @@ class Metadata(object):
         :return: Nothing.
         """
 
+        assert libSquirrel.validate_version(version, "v", 4)
+
         thumbnail_d = os.path.join(self.asset_d, "." + version, "thumbnails")
 
         files_n = os.listdir(thumbnail_d)
@@ -637,6 +719,13 @@ class Metadata(object):
 
         :return:
         """
+
+        assert libSquirrel.validate_version(version, "v", 4)
+        assert type(thumbnails) is list
+        for thumbnail in thumbnails:
+            assert os.path.exists(thumbnail)
+            assert os.path.isfile(thumbnail)
+        assert poster_frame is None or type(poster_frame) is int
 
         data_sizes = filesystem.dir_files_keyed_by_size(self.thumbnail_data_d)
 
