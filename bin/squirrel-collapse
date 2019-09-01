@@ -86,17 +86,6 @@ if __name__ == "__main__":
     # Validate the inputs
     validate_options()
 
-    msg = resc.message("warning")
-    msg = msg.format(asset_name=opts.asset_name)
-    result = None
-    while not result:
-        result = raw_input(msg)
-        if result.upper() in ["N", "Q"]:
-            sys.exit(0)
-        if result.upper() not in ["COLLAPSE"]:
-            msg = resc.message("warning_re_enter")
-            result = None
-
     try:
 
         librarian = librarian.Librarian(opts.language)
@@ -118,6 +107,17 @@ if __name__ == "__main__":
             err.msg = err.msg.format()
             print(err.msg)
             sys.exit(100)
+
+        msg = resc.message("warning")
+        msg = msg.format(asset_name=opts.asset_name)
+        result = None
+        while not result:
+            result = raw_input(msg)
+            if result.upper() in ["N", "Q"]:
+                sys.exit(0)
+            if result.upper() not in ["COLLAPSE"]:
+                msg = resc.message("warning_re_enter")
+                result = None
 
         librarian.collapse(asset_parent_p,
                            opts.asset_name,
