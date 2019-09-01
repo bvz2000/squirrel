@@ -115,8 +115,8 @@ class Asset(object):
         assert type(language) is str
 
         module_d = os.path.split(inspect.stack()[0][1])[0]
-        resources_d = os.path.join(module_d, "..", "..", "resources")
-        config_d = os.path.join(module_d, "..", "..", "config")
+        resources_d = os.path.join(module_d, "..", "..", "..", "resources")
+        config_d = os.path.join(module_d, "..", "..", "..", "config")
         self.resc = resources.Resources(resources_d, "lib_store", language)
 
         self.language = language

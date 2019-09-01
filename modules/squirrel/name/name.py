@@ -62,8 +62,8 @@ class Name(object):
 
         # Read in the resources
         module_d = os.path.split(inspect.stack()[0][1])[0]
-        resources_d = os.path.join(module_d, "..", "..", "resources")
-        config_d = os.path.join(module_d, "..", "..", "config")
+        resources_d = os.path.join(module_d, "..", "..", "..", "resources")
+        config_d = os.path.join(module_d, "..", "..", "..", "config")
         self.resc = resources.Resources(resources_d, "lib_name", language)
 
         self.config_p = os.path.join(config_d, "name.config")
