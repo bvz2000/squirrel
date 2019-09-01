@@ -26,7 +26,11 @@ import inspect
 import os.path
 import shutil
 
+from bvzlib import config
 from bvzlib import resources
+
+from squirrel.shared import envvars
+from squirrel.shared.squirrelerror import SquirrelError
 
 import remap
 
@@ -47,15 +51,51 @@ class Gather(object):
     break.
     """
 
+    # --------------------------------------------------------------------------
     def __init__(self,
-                 files,
-                 dest,
-                 mapping=None,
-                 padding=None,
-                 udim_identifier=None,
-                 strict_udim_format=True,
-                 match_hash_length=False,
                  language="english"):
+        """
+        Initializes the instance.
+
+        :param language: The language used for communication with the end user.
+               Defaults to "english".
+
+        :return: Nothing.
+        """
+
+        self.language = language
+
+        module_d = os.path.split(inspect.stack()[0][1])[0]
+        resources_d = os.path.join(module_d, "..", "..", "..", "resources")
+        config_d = os.path.join(module_d, "..", "..", "..", "config")
+        self.resc = resources.Resources(resources_d, "lib_gather", language)
+
+        self.config_p = os.path.join(config_d, "gather.config")
+        self.config_p = os.path.abspath(self.config_p)
+        self.config_obj = config.Config(self.config_p,
+                                        envvars.SQUIRREL_GATHER_CONFIG_PATH)
+
+        self.validate_config()
+
+        self.files = None
+        self.dest = None
+        self.mapping = None
+        self.padding = None
+        self.udim_identifier = None
+        self.strict_udim_format = None
+        self.match_hash_length = None
+        self.remap_objs = None
+        self.remapped = None
+
+    # --------------------------------------------------------------------------
+    def set_attributes(self,
+                       files,
+                       dest,
+                       mapping=None,
+                       padding=None,
+                       udim_identifier=None,
+                       strict_udim_format=True,
+                       match_hash_length=False):
         """
         :param files: A list of file paths to be gathered. Note that these can
                also be in the format of a sequence, contain sequence identifiers
@@ -69,8 +109,11 @@ class Gather(object):
                tx : maps/textures
                abc : geo
 
-               If None, uses a built-in, default map. Defaults to None.
-
+               If None, attempts to read the mapping from the config file.
+               If the env var: SQUIRREL_GATHER_MAPPING is set, it uses that
+               value to choose which mapping in the config to read. If that env
+               variable is not set, it uses the config file to determine which
+               mapping to use. Defaults to None.
         :param padding: Any padding to use when expanding frame specs. If None,
                then the padding will be determined from the longest number in
                the sequence. Defaults to None.
@@ -92,13 +135,9 @@ class Gather(object):
                any sequence number, no matter how long, would match. If the
                sequence identifier is in the printf format, this argument is
                ignored.
-        :param language: The language used for communication with the end user.
-               Defaults to "english".
-        """
 
-        module_d = os.path.split(inspect.stack()[0][1])[0]
-        resources_d = os.path.join(module_d, "..", "..", "..", "resources")
-        self.resc = resources.Resources(resources_d, "lib_gather", language)
+        :return: Nothing.
+        """
 
         self.files = files
         self.dest = dest
@@ -110,6 +149,64 @@ class Gather(object):
 
         self.remap_objs = list()
         self.remapped = dict()
+
+        if not self.mapping:
+            if envvars.SQUIRREL_GATHER_MAPPING in os.environ:
+                mapping_type = os.environ[envvars.SQUIRREL_GATHER_MAPPING]
+            else:
+                mapping_type = self.config_obj.get("settings", "default")
+
+            mapping = self.config_obj.items(mapping_type)
+            self.mapping = dict()
+            for entry in mapping:
+                path_list = [item.strip() for item in entry[1].split(",")]
+                self.mapping[entry[0]] = os.path.join(*path_list)
+
+    # --------------------------------------------------------------------------
+    def validate_config(self):
+        """
+        Makes sure the config file is valid. Raises a squirrel error if not.
+
+        :return: Nothing.
+        """
+
+        # Create a list of sections and settings that must exist
+        sections = dict()
+        sections["settings"] = ["default"]
+
+        failures = self.config_obj.validation_failures(sections)
+        if failures:
+            if failures[1] is None:
+                err = self.resc.error(501)
+                err.msg = err.msg.format(config_p=self.config_p,
+                                         section=failures[0])
+                raise SquirrelError(err.msg, err.code)
+            else:
+                err = self.resc.error(502)
+                err.msg = err.msg.format(config_p=self.config_p,
+                                         setting=failures[0],
+                                         section=failures[1])
+                raise SquirrelError(err.msg, err.code)
+
+        # Verify that the env var and setting both point to a valid mapping.
+        mapping = None
+        if envvars.SQUIRREL_GATHER_MAPPING in os.environ:
+            mapping = os.environ[envvars.SQUIRREL_GATHER_MAPPING]
+
+        if mapping and not self.config_obj.has_section(mapping):
+            err = self.resc.error(503)
+            err.msg = err.msg.format(env_var=envvars.SQUIRREL_GATHER_MAPPING,
+                                     mapping=mapping,
+                                     config_path=self.config_obj.config_p)
+            raise SquirrelError(err.msg, err.code)
+
+        mapping = self.config_obj.get("settings", "default")
+
+        if mapping and not self.config_obj.has_section(mapping):
+            err = self.resc.error(504)
+            err.msg = err.msg.format(mapping=mapping,
+                                     config_path=self.config_obj.config_p)
+            raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def remap_files(self):
