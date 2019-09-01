@@ -33,7 +33,7 @@ import sys
 from bvzlib import options
 from bvzlib import resources
 
-from shared import envvars
+from squirrel.shared import envvars
 
 OPTIONS = [
     "language",

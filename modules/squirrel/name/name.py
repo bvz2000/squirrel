@@ -26,9 +26,9 @@ import os
 from bvzlib import config
 from bvzlib import resources
 
-from interface import schemainterface
-from shared import envvars
-from shared.squirrelerror import SquirrelError
+from squirrel.interface import schemainterface
+from squirrel.shared import envvars
+from squirrel.shared.squirrelerror import SquirrelError
 
 
 # ==============================================================================

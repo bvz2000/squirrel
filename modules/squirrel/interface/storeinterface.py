@@ -1,6 +1,5 @@
-
-from store import asset
-from store import libStore
+from squirrel.store import asset
+from squirrel.store import libStore
 
 
 # ==============================================================================

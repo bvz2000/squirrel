@@ -29,8 +29,8 @@ from bvzlib import filesystem
 from bvzlib import resources
 from bvzlib import listTools
 
-from shared import libSquirrel
-from shared.squirrelerror import SquirrelError
+from squirrel.shared import libSquirrel
+from squirrel.shared.squirrelerror import SquirrelError
 
 
 # ==============================================================================

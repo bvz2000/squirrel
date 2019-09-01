@@ -32,8 +32,8 @@ import sys
 from bvzlib import options
 from bvzlib import resources
 
-from librarian import librarian
-from shared.squirrelerror import SquirrelError
+from squirrel.librarian import librarian
+from squirrel.shared.squirrelerror import SquirrelError
 
 OPTIONS = [
     "asset_name",

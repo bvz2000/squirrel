@@ -25,8 +25,8 @@ import os
 
 from bvzlib import resources
 
-from shared import libSquirrel
-from shared.squirrelerror import SquirrelError
+from squirrel.shared import libSquirrel
+from squirrel.shared.squirrelerror import SquirrelError
 
 
 # ==============================================================================

@@ -1,5 +1,5 @@
 
-from schema import manager
+from squirrel.schema import manager
 
 
 # ==============================================================================

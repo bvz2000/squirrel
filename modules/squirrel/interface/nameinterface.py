@@ -1,5 +1,4 @@
-
-from name import name
+from squirrel.name import name
 
 
 # ==============================================================================

@@ -7,12 +7,12 @@ from bvzlib import config
 from bvzlib import filesystem
 from bvzlib import resources
 
-from shared import envvars
-from shared.squirrelerror import SquirrelError
+from squirrel.shared import envvars
+from squirrel.shared.squirrelerror import SquirrelError
 
-from interface import storeinterface
+from squirrel.interface import storeinterface
 
-from schema import repo
+from squirrel.schema import repo
 
 
 # ==============================================================================

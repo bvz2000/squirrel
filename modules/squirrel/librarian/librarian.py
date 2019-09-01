@@ -26,12 +26,12 @@ import os
 from bvzlib import config
 from bvzlib import resources
 
-from interface import nameinterface
-from interface import schemainterface
-from interface import storeinterface
+from squirrel.interface import nameinterface
+from squirrel.interface import schemainterface
+from squirrel.interface import storeinterface
 
-from shared import envvars
-from shared.squirrelerror import SquirrelError
+from squirrel.shared import envvars
+from squirrel.shared.squirrelerror import SquirrelError
 
 
 # ==============================================================================

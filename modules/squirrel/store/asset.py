@@ -30,9 +30,8 @@ from bvzlib import resources
 from bvzlib import filesystem
 from bvzlib import config
 
-from shared import envvars
-from shared import libSquirrel
-from shared.squirrelerror import SquirrelError
+from squirrel.shared import envvars, libSquirrel
+from squirrel.shared.squirrelerror import SquirrelError
 
 import meta
 import pin

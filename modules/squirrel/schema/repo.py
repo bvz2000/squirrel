@@ -5,8 +5,8 @@ import os
 from bvzlib import filesystem
 from bvzlib import resources
 
-from interface import storeinterface
-from shared.squirrelerror import SquirrelError
+from squirrel.interface import storeinterface
+from squirrel.shared.squirrelerror import SquirrelError
 
 
 # ==============================================================================
