@@ -41,6 +41,9 @@ class Pin(object):
                  language="english"):
         """
         An object responsible for managing pins.
+
+        :param language: The language used for communication with the end user.
+               Defaults to "english".
         """
 
         module_d = os.path.split(inspect.stack()[0][1])[0]
