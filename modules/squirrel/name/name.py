@@ -67,6 +67,7 @@ class Name(object):
         self.resc = resources.Resources(resources_d, "lib_name", language)
 
         self.config_p = os.path.join(config_d, "name.config")
+        self.config_p = os.path.abspath(self.config_p)
         self.config_obj = config.Config(self.config_p,
                                         envvars.SQUIRREL_STORE_CONFIG_PATH)
 
@@ -86,24 +87,19 @@ class Name(object):
         sections["description"] = ["allow_uppercase", "allow_lowercase"]
         sections["variant"] = ["allow_uppercase", "allow_lowercase"]
 
-        for section in sections:
-            try:
-                assert self.config_obj.has_section(section)
-            except AssertionError:
+        failures = self.config_obj.validation_failures(sections)
+        if failures:
+            if failures[1] is None:
                 err = self.resc.error(501)
                 err.msg = err.msg.format(config_p=self.config_p,
-                                         section=section)
+                                         section=failures[0])
                 raise SquirrelError(err.msg, err.code)
-
-            for setting in sections[section]:
-                try:
-                    assert self.config_obj.has_option(section, setting)
-                except AssertionError:
-                    err = self.resc.error(502)
-                    err.msg = err.msg.format(config_p=self.config_p,
-                                             setting=setting,
-                                             section=section)
-                    raise SquirrelError(err.msg, err.code)
+            else:
+                err = self.resc.error(502)
+                err.msg = err.msg.format(config_p=self.config_p,
+                                         setting=failures[0],
+                                         section=failures[1])
+                raise SquirrelError(err.msg, err.code)
 
         # Check for conflicting settings
         for section in sections:
