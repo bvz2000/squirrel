@@ -122,6 +122,7 @@ class Asset(object):
         self.language = language
 
         self.config_p = os.path.join(config_d, "store.config")
+        self.config_p = os.path.abspath(self.config_p)
         self.config_obj = config.Config(self.config_p,
                                         envvars.SQUIRREL_NAME_CONFIG_PATH)
 
@@ -160,22 +161,19 @@ class Asset(object):
         sections = dict()
         sections["skip list regex"] = [None]
 
-        # Check sections
-        for section in sections:
-            if not self.config_obj.has_section(section):
+        failures = self.config_obj.validation_failures(sections)
+        if failures:
+            if failures[1] is None:
                 err = self.resc.error(501)
                 err.msg = err.msg.format(config_p=self.config_p,
-                                         section=section)
+                                         section=failures[0])
                 raise SquirrelError(err.msg, err.code)
-
-            for setting in sections[section]:
-                if setting:
-                    if not self.config_obj.has_option(section, setting):
-                        err = self.resc.error(502)
-                        err.msg = err.msg.format(config_p=self.config_p,
-                                                 setting=setting,
-                                                 section=section)
-                        raise SquirrelError(err.msg, err.code)
+            else:
+                err = self.resc.error(502)
+                err.msg = err.msg.format(config_p=self.config_p,
+                                         setting=failures[0],
+                                         section=failures[1])
+                raise SquirrelError(err.msg, err.code)
 
     # --------------------------------------------------------------------------
     def set_attributes(self,
