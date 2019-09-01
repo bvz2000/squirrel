@@ -47,6 +47,7 @@ OPTIONS = [
     "ignore_missing",
     "skip_published",
     "repo",
+    "language",
 ]
 
 
@@ -128,7 +129,8 @@ if __name__ == "__main__":
     try:
 
         # Gather the sources
-        gather_obj = gather.Gather(
+        gather_obj = gather.Gather(opts.language)
+        gather_obj.set_attributes(
             files=opts.source,
             dest=opts.destination,
             mapping=mapping,
