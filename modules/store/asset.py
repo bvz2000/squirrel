@@ -913,7 +913,9 @@ class Asset(object):
             test_p = os.path.join(self.asset_d, item)
             if (os.path.islink(test_p)
                     and item != "LATEST"
-                    and item != "CURRENT"):
+                    and item != "CURRENT"
+                    and item != ".LATEST"
+                    and item != ".CURRENT"):
                 output.append(item)
         return output
 
@@ -978,8 +980,9 @@ class Asset(object):
         """
 
         assert type(meta_vers) is list
+
         for meta_ver in meta_vers:
-            assert libSquirrel.validate_version(meta_ver, "v", 4)
+            assert libSquirrel.validate_version(meta_ver, ".v", 4)
 
         pattern = r"^\.v[0-9][0-9][0-9][0-9]$"
         if type(meta_vers) != list:
@@ -1051,7 +1054,7 @@ class Asset(object):
             raise OSError(err.msg)
 
         # Get a list of all the files referenced by the other versions
-        keep_vers_n = self.invert_version_list(version)
+        keep_vers_n = self.invert_version_list([version])
         keep_vers_d = [os.path.join(self.asset_d, n) for n in keep_vers_n]
         keep_lnks_p = filesystem.recursively_list_files_in_dirs(keep_vers_d)
         keep_files_p = filesystem.symlinks_to_real_paths(keep_lnks_p)
@@ -1067,7 +1070,7 @@ class Asset(object):
                     os.remove(psbl_del_file_p)
 
         # Get a list of all the files referenced by the other metadata
-        keep_vers_n = self.invert_metadata_list("." + version)
+        keep_vers_n = self.invert_metadata_list(["." + version])
         keep_vers_d = [os.path.join(self.asset_d, n) for n in keep_vers_n]
         keep_lnks_p = filesystem.recursively_list_files_in_dirs(keep_vers_d)
         keep_files_p = filesystem.symlinks_to_real_paths(keep_lnks_p)
@@ -1116,6 +1119,7 @@ class Asset(object):
                                    keep_ver_n,
                                    "CURRENT")
             pin_obj.set_pin()
+
             # Delete any other pins that may point to the deleted versions
             for del_ver_n in del_vers_n:
                 linked_pins = self.version_pins(del_ver_n)
