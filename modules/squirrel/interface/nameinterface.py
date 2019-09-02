@@ -32,3 +32,7 @@ class NameInterface(object):
     # --------------------------------------------------------------------------
     def extract_metadata_from_name(self):
         return self.name_obj.extract_metadata_from_name()
+
+    # --------------------------------------------------------------------------
+    def extract_token_from_name(self):
+        return self.name_obj.extract_token_from_name()
