@@ -113,14 +113,13 @@ class Name(object):
 
     # --------------------------------------------------------------------------
     def set_attributes(self,
-                       name=None,
-                       repo_n=None):
+                       name,
+                       repo_n):
         """
         Set the attributes for this object.
 
         :param name: The name of the asset we are validating.
-        :param repo_n: The name of the repo we are validating against. If None,
-               then the default repo will be used.
+        :param repo_n: The name of the repo we are validating against.
 
         :return: Nothing.
         """
