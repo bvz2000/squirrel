@@ -574,20 +574,21 @@ class RepoManager(object):
         :return: A path where files should be gathered to.
         """
 
-        try:
-            gather_loc = envvars.SQUIRREL_DEFAULT_GATHER_LOC
-            return gather_loc
-        except KeyError:
-            pass
+        if envvars.SQUIRREL_DEFAULT_GATHER_LOC in os.environ:
+            gather_loc = os.environ[envvars.SQUIRREL_DEFAULT_GATHER_LOC]
+            if os.path.exists(gather_loc) and os.path.isdir(gather_loc):
+                return gather_loc
 
         try:
             gather_loc = self.config_obj.get("settings", "default_gather_loc")
-            return gather_loc
+            if os.path.exists(gather_loc) and os.path.isdir(gather_loc):
+                return gather_loc
         except (ConfigParser.NoSectionError,
                 ConfigParser.NoOptionError,
                 ValueError):
             pass
 
+        # TODO actually create a temp dir?
         return tempfile.gettempdir()
 
     # --------------------------------------------------------------------------
