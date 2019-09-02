@@ -88,11 +88,20 @@ class RepoManager(object):
         """
         Loads a single repo.
 
-        :param repo_p: The path to the repo to load. Assumes that the path
-               exists and is a valid repo. Raises an error if not.
+        :param repo_p: The path to the repo to load. The path must exist and
+               must be a valid repo. Raises an error if not.
 
         :return: Nothing.
         """
+
+        assert os.path.isabs(repo_p)
+        assert os.path.exists(repo_p)
+        assert os.path.isdir(repo_p)
+
+        if not self.repo_path_is_valid(repo_p):
+            err = self.resc.error(200)
+            err.msg = err.msg.format(root_path=repo_p)
+            raise SquirrelError(err.msg, err.code)
 
         repo_obj = repo.Repo(repo_p, self.language)
         self.repos[repo_obj.name] = repo_obj
@@ -107,6 +116,8 @@ class RepoManager(object):
 
         :return: Nothing.
         """
+
+        assert type(repo_n) is str and repo_n
 
         if repo_n in self.repos.keys():
             del(self.repos[repo_n])
@@ -124,6 +135,8 @@ class RepoManager(object):
 
         :return: Nothing.
         """
+
+        assert type(silence) is bool
 
         try:
             warn = self.config_obj.getboolean("settings", "warn_on_load_error")
@@ -167,6 +180,9 @@ class RepoManager(object):
 
         :return: True if the repo is valid. False otherwise.
         """
+
+        assert type(repo_n) is str and repo_n
+
         return repo_n in self.repos.keys()
 
     # --------------------------------------------------------------------------
@@ -181,6 +197,9 @@ class RepoManager(object):
 
         :return: True if the repo is valid. False otherwise.
         """
+
+        assert type(repo_p) is str and repo_p
+
         if not os.path.exists(repo_p):
             return False
 
@@ -204,6 +223,13 @@ class RepoManager(object):
         """
 
         assert os.path.isabs(repo_p)
+        assert os.path.exists(repo_p)
+        assert os.path.isdir(repo_p)
+
+        if not self.repo_path_is_valid(repo_p):
+            err = self.resc.error(200)
+            err.msg = err.msg.format(root_path=repo_p)
+            raise SquirrelError(err.msg, err.code)
 
         # The following may error out, let the calling function deal with it.
         repo_obj = repo.Repo(repo_p, self.language)
@@ -229,6 +255,14 @@ class RepoManager(object):
         :return: Nothing.
         """
 
+        assert os.path.exists(repo_p)
+        assert os.path.isdir(repo_p)
+
+        if not self.repo_path_is_valid(repo_p):
+            err = self.resc.error(200)
+            err.msg = err.msg.format(root_path=repo_p)
+            raise SquirrelError(err.msg, err.code)
+
         self.load_repo(repo_p)
         self.add_repo_to_config(repo_p)
 
@@ -244,6 +278,8 @@ class RepoManager(object):
 
         :return: Nothing.
         """
+
+        assert type(repo_n) is str and repo_n
 
         if not self.config_obj.has_section("repos"):
             self.config_obj.add_section("repos")
@@ -263,6 +299,8 @@ class RepoManager(object):
 
         :return: Nothing.
         """
+
+        assert type(repo_n) is str and repo_n
 
         self.unload_repo(repo_n)
         self.remove_repo_from_config(repo_n)
@@ -338,6 +376,8 @@ class RepoManager(object):
         :return:
         """
 
+        assert type(repo_n) is str and repo_n
+
         # The target repo must exist in the list of repos
         if not self.config_obj.has_section("repos"):
             err = self.resc.error(100)
@@ -376,6 +416,8 @@ class RepoManager(object):
                  name cannot resolve to a real repo.
         """
 
+        assert type(repo_n) is str and repo_n
+
         try:
             return self.repos[repo_n].repo_root_d
         except KeyError:
@@ -407,8 +449,15 @@ class RepoManager(object):
 
         :return: Nothing.
         """
+
+        assert os.path.isabs(path_d)
+        assert os.path.exists(path_d)
+        assert os.path.isdir(path_d)
+        assert type(root) is bool
         if root:
-            assert repo_n is not None
+            assert type(repo_n) is str and repo_n
+
+        if root:
             if os.path.exists(os.path.join(path_d, ".repo_root")):
                 semaphore_obj = ConfigParser.ConfigParser()
                 semaphore_obj.read(os.path.join(path_d, ".repo_root"))
@@ -499,6 +548,11 @@ class RepoManager(object):
         :return: Nothing.
         """
 
+        assert os.path.isabs(root_d)
+        assert os.path.exists(root_d)
+        assert os.path.isdir(root_d)
+        assert type(repo_n) is str and repo_n
+
         if not os.path.exists(root_d):
             err = self.resc.error(400)
             err.msg = err.msg.format(path=root_d)
@@ -546,9 +600,12 @@ class RepoManager(object):
         :return: True if the file is within the repo structure. False otherwise.
         """
 
-        if not check_all_repos:
-            assert repo_names is not None
+        assert os.path.exists(file_p)
+        assert type(check_all_repos) is bool
+        if check_all_repos:
             assert type(repo_names) is list
+            for repo_name in repo_names:
+                assert type(repo_name) is str
 
         if check_all_repos:
             repo_names = self.repos.keys()
@@ -608,6 +665,8 @@ class RepoManager(object):
         :return: A repo object corresponding to the name given.
         """
 
+        assert repo_n is None or (type(repo_n) is str and repo_n)
+
         if not repo_n:
 
             repo_n = self.get_default_repo()
@@ -631,8 +690,15 @@ class RepoManager(object):
         """
         Returns the path where files should be published to.
 
+        :param token: A token describing the asset
+        :param repo_n: The name of the repo we are validating against. If
+               None, then the default repo will be used.
+
         :return: A path where files should be published to.
         """
+
+        assert type(token) is str and token
+        assert repo_n is None or (type(repo_n) is str and repo_n)
 
         repo_obj = self.get_repo(repo_n)
 
@@ -652,6 +718,9 @@ class RepoManager(object):
         :return: A path where files should be published to.
         """
 
+        assert type(token) is str and token
+        assert repo_n is None or (type(repo_n) is str and repo_n)
+
         repo_obj = self.get_repo(repo_n)
 
         return repo_obj.token_is_valid(token)
@@ -669,6 +738,9 @@ class RepoManager(object):
 
         :return: A list of the next possible tokens.
         """
+
+        assert type(token) is str and token
+        assert repo_n is None or (type(repo_n) is str and repo_n)
 
         repo_obj = self.get_repo(repo_n)
 
@@ -688,6 +760,9 @@ class RepoManager(object):
 
         :return: True if the given token is a leaf, False otherwise.
         """
+
+        assert type(token) is str and token
+        assert repo_n is None or (type(repo_n) is str and repo_n)
 
         repo_obj = self.get_repo(repo_n)
 
