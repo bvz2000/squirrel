@@ -768,7 +768,7 @@ class Metadata(object):
         :return: Nothing.
         """
 
-        if self.thumbnails is None:
+        if not self.thumbnails:
             if self.merge:
                 self.carry_forward_thumbnails()
             return
