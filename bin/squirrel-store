@@ -49,6 +49,7 @@ OPTIONS = [
     "merge",
     "pins",
     "verify",
+    "verbosity",
     "language",
 ]
 
@@ -64,28 +65,32 @@ def validate_options():
     if len(sys.argv) != 0:
         err = resc.error(100)
         err.msg = err.msg.format()
-        print(err.msg)
+        if opts.verbosity > 0:
+            print(err.msg)
         sys.exit(100)
 
     # Source file or directory must exist
     if not os.path.exists(opts.source):
         err = resc.error(101)
         err.msg = err.msg.format(source=opts.source)
-        print(err.msg)
+        if opts.verbosity > 0:
+            print(err.msg)
         sys.exit(101)
 
     # Dest directory must exist
     if not os.path.exists(opts.destination):
         err = resc.error(102)
         err.msg = err.msg.format(dest=opts.destination)
-        print(err.msg)
+        if opts.verbosity > 0:
+            print(err.msg)
         sys.exit(102)
 
     # Dest directory must be a directory
     if not os.path.isdir(opts.destination):
         err = resc.error(103)
         err.msg = err.msg.format(dest=opts.destination)
-        print(err.msg)
+        if opts.verbosity > 0:
+            print(err.msg)
         sys.exit(103)
 
     # Thumbnails must exist
@@ -94,7 +99,8 @@ def validate_options():
             if not os.path.exists(thumbnail_file):
                 err = resc.error(104)
                 err.msg = err.msg.format(thumbnail_file=thumbnail_file)
-                print(err.msg)
+                if opts.verbosity > 0:
+                    print(err.msg)
                 sys.exit(104)
 
     # Thumbnails must be named correctly
@@ -102,19 +108,21 @@ def validate_options():
         pattern = opts.name + "\.[0-9]+\..+"
         for thumbnail_file in opts.thumbnails:
             thumbnail_file = os.path.split(thumbnail_file)[1]
-            results = re.match(pattern, thumbnail_file)
-            if not results:
+            match = re.match(pattern, thumbnail_file)
+            if not match:
                 err = resc.error(105)
                 err.msg = err.msg.format(name=opts.name,
                                          thumbnail_file=thumbnail_file)
-                print(err.msg)
+                if opts.verbosity > 0:
+                    print(err.msg)
                 sys.exit(105)
 
     # Poster frame number only relevant if thumbnails are provided
     if not opts.thumbnails and opts.poster_frame:
         err = resc.error(106)
         err.msg = err.msg.format(frame=str(opts.poster_frame))
-        print(err.msg)
+        if opts.verbosity > 0:
+            print(err.msg)
         sys.exit(106)
 
     # Poster frame must exist
@@ -123,14 +131,15 @@ def validate_options():
         found = False
         for thumbnail_file in opts.thumbnails:
             thumbnail_file = os.path.split(thumbnail_file)[1]
-            results = re.match(pattern, thumbnail_file)
-            if results:
+            match = re.match(pattern, thumbnail_file)
+            if match:
                 found = True
                 break
         if not found:
             err = resc.error(107)
             err.msg = err.msg.format(frame=str(opts.poster_frame))
-            print(err.msg)
+            if opts.verbosity > 0:
+                print(err.msg)
             sys.exit(107)
 
 
@@ -159,6 +168,20 @@ if __name__ == "__main__":
 
     opts = opts_obj.opts
     sys.argv = opts_obj.args
+
+    try:
+        opts.verbosity = int(opts.verbosity)
+    except ValueError:
+        error = resc.error(107)
+        error.msg = error.msg.format()
+        print(error.msg)
+        sys.exit(107)
+
+    if opts.verbosity > 1:
+        error = resc.error(107)
+        error.msg = error.msg.format(frame=str(opts.poster_frame))
+        print(error.msg)
+        sys.exit(107)
 
     opts.source = opts.source.rstrip("/")
     if opts.name == "":
@@ -209,6 +232,16 @@ if __name__ == "__main__":
             verify_copy=opts.verify)
 
         store_interface.store()
+
+        if opts.verbosity > 0:
+            results = store_interface.list_stored()
+            print(resc.message("copied_heading"))
+            for source in results:
+                output = "   "
+                output += os.path.split(source)[1]
+                output += " --> "
+                output += results[source]
+                print(output)
 
     except SquirrelError as e:
         print(e.message)
