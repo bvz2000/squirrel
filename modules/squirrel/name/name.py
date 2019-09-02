@@ -201,7 +201,12 @@ class Name(object):
 
         # If any of these fail, raise an error
         if missing_var:
-            err = self.resc.error(901)
+            if not allow_upper:
+                err = self.resc.error(902)
+            if not allow_lower:
+                err = self.resc.error(903)
+            if allow_lower and allow_upper:
+                err = self.resc.error(901)
             raise SquirrelError(err.msg, err.code)
 
         return variant
@@ -368,6 +373,19 @@ class Name(object):
         return tokens, desc, variant
 
     # --------------------------------------------------------------------------
+    def extract_token_from_name(self):
+        """
+        Given a name, extracts the token from it.
+
+        :return: A string that is a token (i.e. if the name is:
+                 asset_bldg_com_description_A, then this will return
+                 asset/bldg/com).
+        """
+
+        metadata = self.extract_metadata_from_name()
+        return metadata[0]
+
+    # --------------------------------------------------------------------------
     def validate_name(self):
         """
         Given a name, tries to validate it. Raises a SquirrelError if it does
@@ -376,7 +394,7 @@ class Name(object):
         :return: Nothing.
         """
 
-        assert self.name
-        assert self.repo_n
+        assert type(self.name) is str and self.name != ""
+        assert type(self.repo_n) is str and self.repo_n != ""
 
         self.extract_metadata_from_name()
