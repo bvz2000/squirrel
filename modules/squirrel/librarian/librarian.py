@@ -238,8 +238,8 @@ class Librarian(object):
 
     # --------------------------------------------------------------------------
     def validate_name(self,
-                      item_n=None,
-                      repo_n=None):
+                      item_n,
+                      repo_n):
         """
         Validates the name.
 
@@ -248,6 +248,9 @@ class Librarian(object):
 
         :return: Nothing.
         """
+
+        assert type(item_n) is str
+        assert type(repo_n) is str
 
         if self.local_mode:
             self.name_interface.set_attributes(item_n, repo_n)
@@ -265,12 +268,31 @@ class Librarian(object):
         :param item_n: The name we are trying to validate.
         :param repo_n: The repo that the name will be validated against.
 
-        :return: Nothing.
+        :return: The metadata in the format of a tuple: token, desc, variant.
         """
 
         if self.local_mode:
-            return self.name_interface.extract_metadata_from_name(repo_n,
-                                                                  item_n)
+            self.name_interface.set_attributes(item_n, repo_n)
+            return self.name_interface.extract_metadata_from_name()
+        else:
+            raise SquirrelError("Remote operation not yet implemented.", 1)
+
+    # --------------------------------------------------------------------------
+    def extract_token_from_name(self,
+                                item_n=None,
+                                repo_n=None):
+        """
+        Extracts the metadata from the name.
+
+        :param item_n: The name we are trying to validate.
+        :param repo_n: The repo that the name will be validated against.
+
+        :return: The metadata in the format of a tuple: token, desc, variant.
+        """
+
+        if self.local_mode:
+            self.name_interface.set_attributes(item_n, repo_n)
+            return self.name_interface.extract_token_from_name()
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
