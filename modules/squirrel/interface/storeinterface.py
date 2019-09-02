@@ -62,6 +62,10 @@ class StoreInterface(object):
         self.asset_obj.store()
 
     # --------------------------------------------------------------------------
+    def list_stored(self):
+        return self.asset_obj.list_stored()
+
+    # --------------------------------------------------------------------------
     def collapse(self,
                  del_orphaned_pins):
         self.asset_obj.collapse(del_orphaned_pins)
