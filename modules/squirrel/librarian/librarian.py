@@ -174,7 +174,8 @@ class Librarian(object):
 
     # --------------------------------------------------------------------------
     def token_is_valid(self,
-                       token):
+                       token,
+                       repo_n=None):
         """
         Returns whether or not a token is valid.
 
@@ -182,7 +183,7 @@ class Librarian(object):
         """
 
         if self.local_mode:
-            return self.schema_interface.token_is_valid(token)
+            return self.schema_interface.token_is_valid(token, repo_n)
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
@@ -202,7 +203,7 @@ class Librarian(object):
     # --------------------------------------------------------------------------
     def get_publish_loc(self,
                         token,
-                        repo):
+                        repo=None):
         """
         Returns where the asset should be published to.
 
