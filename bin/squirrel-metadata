@@ -109,6 +109,9 @@ if __name__ == "__main__":
     else:
         opts.metadata = dict()
 
+    if not opts.repo:
+        opts.repo = None
+
     try:
 
         librarian = librarian.Librarian(opts.language)

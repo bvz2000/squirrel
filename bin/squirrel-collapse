@@ -83,6 +83,9 @@ if __name__ == "__main__":
     opts = opts_obj.opts
     sys.argv = opts_obj.args
 
+    if not opts.repo:
+        opts.repo = None
+
     # Validate the inputs
     validate_options()
 

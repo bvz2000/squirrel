@@ -175,7 +175,7 @@ if __name__ == "__main__":
         librarian = librarian.Librarian(opts.language)
 
         if not opts.repo:
-            opts.repo = librarian.get_default_repo()
+            opts.repo = None
 
         if not opts.name:
             opts.name = os.path.split(opts.source)[1]

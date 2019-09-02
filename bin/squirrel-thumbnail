@@ -135,6 +135,9 @@ if __name__ == "__main__":
     opts = opts_obj.opts
     sys.argv = opts_obj.args
 
+    if not opts.repo:
+        opts.repo = None
+
     if opts.thumbnails:
 
         thumbnails_dir = os.path.split(opts.thumbnails)[0]

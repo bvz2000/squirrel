@@ -103,6 +103,9 @@ if __name__ == "__main__":
     opts = opts_obj.opts
     sys.argv = opts_obj.args
 
+    if not opts.repo:
+        opts.repo = None
+
     try:
 
         librarian = librarian.Librarian(opts.language)
