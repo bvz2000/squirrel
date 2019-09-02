@@ -316,11 +316,30 @@ class Asset(object):
         self.prev_ver_n = self.get_highest_ver()
         self.prev_ver_d = os.path.join(self.asset_d, self.prev_ver_n)
 
-        self.metadata = metadata
-        self.keywords = keywords
-        self.notes = notes
-        self.thumbnails = thumbnails
-        self.poster_frame = poster_frame
+        if not metadata:
+            self.metadata = dict()
+        else:
+            self.metadata = metadata
+
+        if not keywords:
+            self.keywords = list()
+        else:
+            self.keywords = keywords
+
+        if not notes:
+            self.notes = ""
+        else:
+            self.notes = notes
+
+        if not thumbnails:
+            self.thumbnails = list()
+        else:
+            self.thumbnails = thumbnails
+
+        if not poster_frame:
+            self.poster_frame = 1
+        else:
+            self.poster_frame = poster_frame
 
         self.merge = merge
         self.pins = pins
