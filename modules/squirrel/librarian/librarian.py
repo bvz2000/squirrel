@@ -423,6 +423,17 @@ class Librarian(object):
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
     # --------------------------------------------------------------------------
+    def list_stored(self):
+        """
+        After a store operation, this will list the files that were stored
+
+        :return: A dictionary where the key is the source file and the value
+                 is the path to the copied file.
+        """
+
+        return self.store_interface.list_stored()
+
+    # --------------------------------------------------------------------------
     def get_pins(self,
                  asset_p,
                  asset_name,
