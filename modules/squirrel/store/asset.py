@@ -149,6 +149,7 @@ class Asset(object):
         self.pins = None
         self.verify_copy = None
         self.skip_list_regex = None
+        self.results = dict()
 
     # --------------------------------------------------------------------------
     def validate_config(self):
@@ -583,6 +584,8 @@ class Asset(object):
                     num_digits=4,
                     do_verified_copy=self.verify_copy)
 
+                self.results[self.src_p] = os.path.join(self.curr_ver_d, file_n)
+
         else:
 
             # Walk through the entire source hierarchy
@@ -607,6 +610,7 @@ class Asset(object):
 
                     if not skip:
                         source_p = os.path.join(self.src_p, dir_d, file_n)
+                        dest_p = os.path.join(dest_d, file_n)
                         filesystem.copy_file_deduplicated(
                             source_p=source_p,
                             dest_d=dest_d,
@@ -616,6 +620,8 @@ class Asset(object):
                             ver_prefix="sqv",
                             num_digits=4,
                             do_verified_copy=self.verify_copy)
+
+                self.results[self.src_p] = os.path.join(dest_d, file_n)
 
         return True
 
@@ -662,6 +668,17 @@ class Asset(object):
             for pin_name in self.pins:
                 if pin_name.upper() not in ["CURRENT", "LATEST"]:
                     self.set_pin(pin_name.upper(), self.curr_ver_n)
+
+    # --------------------------------------------------------------------------
+    def list_stored(self):
+        """
+        returns a dict where the key is the source file, and the value is the
+        file that was copied.
+
+        :return: A dictionary, key = source file, value = file that was copied.
+        """
+
+        return self.results
 
     # --------------------------------------------------------------------------
     def add_keywords(self,
