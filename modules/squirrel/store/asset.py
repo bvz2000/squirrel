@@ -610,7 +610,6 @@ class Asset(object):
 
                     if not skip:
                         source_p = os.path.join(self.src_p, dir_d, file_n)
-                        dest_p = os.path.join(dest_d, file_n)
                         filesystem.copy_file_deduplicated(
                             source_p=source_p,
                             dest_d=dest_d,
@@ -621,7 +620,7 @@ class Asset(object):
                             num_digits=4,
                             do_verified_copy=self.verify_copy)
 
-                self.results[self.src_p] = os.path.join(dest_d, file_n)
+                        self.results[file_n] = os.path.join(dest_d, file_n)
 
         return True
 
