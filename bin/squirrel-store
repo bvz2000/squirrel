@@ -238,9 +238,9 @@ if __name__ == "__main__":
             print(resc.message("copied_heading"))
             for source in results:
                 output = "   "
-                output += os.path.split(source)[1]
+                output += source
                 output += " --> "
-                output += results[source]
+                output += os.path.abspath(results[source])
                 print(output)
 
     except SquirrelError as e:
