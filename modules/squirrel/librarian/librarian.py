@@ -240,7 +240,7 @@ class Librarian(object):
     # --------------------------------------------------------------------------
     def validate_name(self,
                       item_n,
-                      repo_n):
+                      repo_n=None):
         """
         Validates the name.
 
@@ -249,9 +249,6 @@ class Librarian(object):
 
         :return: Nothing.
         """
-
-        assert type(item_n) is str
-        assert type(repo_n) is str
 
         if self.local_mode:
             self.name_interface.set_attributes(item_n, repo_n)
