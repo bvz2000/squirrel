@@ -82,6 +82,7 @@ class Name(object):
 
         :return: Nothing.
         """
+
         sections = dict()
         sections["tokens"] = ["allow_uppercase", "allow_lowercase"]
         sections["description"] = ["allow_uppercase", "allow_lowercase"]
@@ -114,17 +115,24 @@ class Name(object):
     # --------------------------------------------------------------------------
     def set_attributes(self,
                        name,
-                       repo_n):
+                       repo_n=None):
         """
         Set the attributes for this object.
 
         :param name: The name of the asset we are validating.
-        :param repo_n: The name of the repo we are validating against.
+        :param repo_n: The name of the repo we are validating against. If None,
+               then the default repo will be used.
 
         :return: Nothing.
         """
 
+        assert type(name) is str and name
+        assert repo_n is None or (type(repo_n) is str and repo_n)
+
         self.name = name
+
+        if not repo_n:
+            repo_n = self.schema_interface.get_default_repo()
         self.repo_n = repo_n
 
     # --------------------------------------------------------------------------
@@ -139,7 +147,7 @@ class Name(object):
                  begins or ends with an underscore.
         """
 
-        assert self.name
+        assert type(self.name) is str and self.name
 
         # Error out if there are multiple underscores
         if "__" in self.name:
@@ -166,7 +174,7 @@ class Name(object):
                  help message if the variant does not validate.
         """
 
-        assert self.name
+        assert type(self.name) is str and self.name
 
         allow_upper = self.config_obj.getboolean("variant", "allow_uppercase")
         allow_lower = self.config_obj.getboolean("variant", "allow_lowercase")
@@ -223,8 +231,8 @@ class Name(object):
         :return: The portion of the name that is a valid token.
         """
 
-        assert self.name
-        assert self.repo_n
+        assert type(self.name) is str and self.name
+        assert type(self.repo_n) is str and self.repo_n
 
         allow_upper = self.config_obj.getboolean("tokens", "allow_uppercase")
         allow_lower = self.config_obj.getboolean("tokens", "allow_lowercase")
@@ -303,16 +311,21 @@ class Name(object):
                  NameError if there is no description
         """
 
-        assert self.name
-
-        assert self.name.startswith(token.replace("/", "_"))
-        assert self.name.endswith(variant)
-
         allow_upper = self.config_obj.getboolean("description",
                                                  "allow_uppercase")
         allow_lower = self.config_obj.getboolean("description",
                                                  "allow_lowercase")
+
+        assert type(token) is str and token
+        assert type(variant) is str and variant
+        assert self.name
+        assert self.name.startswith(token.replace("/", "_"))
+        assert self.name.endswith(variant)
         assert not(allow_upper is False and allow_lower is False)
+        if not allow_upper:
+            assert variant.upper() != variant
+        if not allow_lower:
+            assert variant.lower() != variant
 
         description = self.name[len(token):][:-1 * len(variant)]
 
@@ -353,8 +366,8 @@ class Name(object):
                  message if the name is not properly formed.
         """
 
-        assert self.name
-        assert self.repo_n
+        assert type(self.name) is str and self.name
+        assert type(self.repo_n) is str and self.repo_n
 
         # Make sure there are no doubled up underscores
         self.validate_name_underscores()
@@ -381,6 +394,9 @@ class Name(object):
                  asset/bldg/com).
         """
 
+        assert type(self.name) is str and self.name
+        assert type(self.repo_n) is str and self.repo_n
+
         metadata = self.extract_metadata_from_name()
         return metadata[0]
 
@@ -393,7 +409,7 @@ class Name(object):
         :return: Nothing.
         """
 
-        assert type(self.name) is str and self.name != ""
-        assert type(self.repo_n) is str and self.repo_n != ""
+        assert type(self.name) is str and self.name
+        assert type(self.repo_n) is str and self.repo_n
 
         self.extract_metadata_from_name()
