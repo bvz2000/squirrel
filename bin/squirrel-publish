@@ -193,7 +193,10 @@ if __name__ == "__main__":
 
     try:
 
-        librarian = librarian.Librarian(opts.language)
+        librarian = librarian.Librarian(init_name=True,
+                                        init_schema=True,
+                                        init_store=True,
+                                        language=opts.language)
 
         if not opts.repo:
             opts.repo = None

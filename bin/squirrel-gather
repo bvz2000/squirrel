@@ -162,7 +162,10 @@ if __name__ == "__main__":
                 repo_names = opts.repo
                 check_all_repos = False
 
-            librarian = librarian.Librarian()
+            librarian = librarian.Librarian(init_name=False,
+                                            init_schema=True,
+                                            init_store=True,
+                                            language=opts.language)
 
             files_to_cull = list()
             for source_p in gather_obj.remapped:

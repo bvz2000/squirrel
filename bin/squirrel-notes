@@ -102,13 +102,21 @@ if __name__ == "__main__":
 
     try:
 
-        librarian = librarian.Librarian(opts.language)
-
         if opts.local_mode:
+
+            librarian = librarian.Librarian(init_name=False,
+                                            init_schema=False,
+                                            init_store=True,
+                                            language=opts.language)
 
             asset_parent_p = opts.token
 
         else:
+
+            librarian = librarian.Librarian(init_name=False,
+                                            init_schema=True,
+                                            init_store=True,
+                                            language=opts.language)
 
             asset_parent_p = librarian.get_publish_loc(opts.token, opts.repo)
 
