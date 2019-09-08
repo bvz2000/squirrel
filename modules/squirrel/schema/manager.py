@@ -94,10 +94,6 @@ class RepoManager(object):
         :return: Nothing.
         """
 
-        assert os.path.isabs(repo_p)
-        assert os.path.exists(repo_p)
-        assert os.path.isdir(repo_p)
-
         if not self.repo_path_is_valid(repo_p):
             err = self.resc.error(200)
             err.msg = err.msg.format(root_path=repo_p)
@@ -477,12 +473,14 @@ class RepoManager(object):
 
         if repo_n:
             if repo_n in self.repos.keys():
-                existing_real_p = os.path.realpath(self.repos[repo_n].repo_root_d)
+                existing_real_p = os.path.realpath(
+                    self.repos[repo_n].repo_root_d)
                 new_real_p = os.path.realpath(path_d)
                 if existing_real_p != new_real_p:
                     err = self.resc.error(601)
-                    err.msg = err.msg.format(repo=repo_n,
-                                             path=self.repos[repo_n].repo_root_d)
+                    err.msg = err.msg.format(
+                        repo=repo_n,
+                        path=self.repos[repo_n].repo_root_d)
                     raise SquirrelError(err.msg, err.code)
 
         # Create a config parser and save it in the directory, removing any
@@ -645,7 +643,6 @@ class RepoManager(object):
                 ValueError):
             pass
 
-        # TODO actually create a temp dir?
         return tempfile.gettempdir()
 
     # --------------------------------------------------------------------------
@@ -739,7 +736,7 @@ class RepoManager(object):
         :return: A list of the next possible tokens.
         """
 
-        assert type(token) is str and token
+        assert type(token) is str
         assert repo_n is None or (type(repo_n) is str and repo_n)
 
         repo_obj = self.get_repo(repo_n)
