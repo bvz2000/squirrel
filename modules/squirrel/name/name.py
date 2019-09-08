@@ -322,10 +322,6 @@ class Name(object):
         assert self.name.startswith(token.replace("/", "_"))
         assert self.name.endswith(variant)
         assert not(allow_upper is False and allow_lower is False)
-        if not allow_upper:
-            assert variant.upper() != variant
-        if not allow_lower:
-            assert variant.lower() != variant
 
         description = self.name[len(token):][:-1 * len(variant)]
 
