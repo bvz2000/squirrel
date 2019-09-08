@@ -297,17 +297,28 @@ class Gather(object):
 
                     if not os.path.exists(copy_target_p):
 
-                        if verbose:
+                        if os.path.exists(copy_source_p):
 
-                            from_msg = self.resc.message("from")
-                            from_msg = from_msg.format(file=copy_source_p)
-                            to_msg = self.resc.message("to")
-                            to_msg = to_msg.format(file=copy_target_p)
+                            if verbose:
 
-                            print(from_msg)
-                            print(to_msg, "\n")
+                                from_msg = self.resc.message("from")
+                                from_msg = from_msg.format(file=copy_source_p)
+                                to_msg = self.resc.message("to")
+                                to_msg = to_msg.format(file=copy_target_p)
 
-                        shutil.copyfile(copy_source_p, copy_target_p)
+                                print(from_msg)
+                                print(to_msg, "\n")
+
+                            shutil.copyfile(copy_source_p, copy_target_p)
+
+                        else:
+
+                            if verbose:
+
+                                msg = self.resc.message("missing")
+                                msg = msg.format(file=copy_source_p)
+
+                                print(msg, "\n")
 
                     else:
 
