@@ -44,10 +44,27 @@ class Librarian(object):
 
     # --------------------------------------------------------------------------
     def __init__(self,
+                 init_name=False,
+                 init_schema=False,
+                 init_store=False,
                  language="english"):
         """
-        Initialize the librarian.
+        Initialize the librarian. It talks to the name, schema, and store back
+        ends. Any of these that are intended to be used, must be initialized
+        when the librarian is created, or before that particular back end is
+        accessed. By default, all are off. If none of these are initialized,
+        they will need to be initialized prior to access a function that uses
+        the back end, or an assertion error is raised.
 
+        :param init_name: If True, then the name interface will be set up.
+               Must be set to True if the librarian is to interact with the
+               name module.
+        :param init_schema: If True, then the schema interface will be set up.
+               Must be set to True if the librarian is to interact with the
+               schema back end.
+        :param init_store: If True, then the store interface will be set up.
+               Must be set to True if the librarian is to interact with the
+               store back end.
         :param language: The language used for communication with the end user.
                Defaults to "english".
         """
@@ -57,10 +74,6 @@ class Librarian(object):
         config_d = os.path.join(module_d, "..", "..", "..", "config")
         self.resc = resources.Resources(resources_d, "lib_librarian", language)
 
-        self.schema_interface = schemainterface.SchemaInterface(language)
-        self.name_interface = nameinterface.NameInterface(language)
-        self.store_interface = storeinterface.StoreInterface(language)
-
         self.config_p = os.path.join(config_d, "librarian.config")
         self.config_p = os.path.abspath(self.config_p)
         self.config_obj = config.Config(self.config_p,
@@ -69,7 +82,49 @@ class Librarian(object):
 
         self.language = language
 
+        self.name_interface = None
+        if init_name:
+            self.name_interface = nameinterface.NameInterface(language)
+
+        self.schema_interface = None
+        if init_schema:
+            self.schema_interface = schemainterface.SchemaInterface(language)
+
+        self.store_interface = None
+        if init_store:
+            self.store_interface = storeinterface.StoreInterface(language)
+
         self.local_mode = self.config_obj.getboolean("main", "local_mode")
+
+    # --------------------------------------------------------------------------
+    def init_name(self):
+        """
+        Initializes the name back end.
+
+        :return: Nothing.
+        """
+
+        self.name_interface = nameinterface.NameInterface(self.language)
+
+    # --------------------------------------------------------------------------
+    def init_schema(self):
+        """
+        Initializes the name schema end.
+
+        :return: Nothing.
+        """
+
+        self.schema_interface = schemainterface.SchemaInterface(self.language)
+
+    # --------------------------------------------------------------------------
+    def init_store(self):
+        """
+        Initializes the store back end.
+
+        :return: Nothing.
+        """
+
+        self.store_interface = storeinterface.StoreInterface(self.language)
 
     # --------------------------------------------------------------------------
     def validate_config(self):
@@ -108,6 +163,8 @@ class Librarian(object):
         :return: True if it is a valid repo. False otherwise.
         """
 
+        assert self.schema_interface
+
         if self.local_mode:
             return self.schema_interface.repo_name_is_valid(repo_name)
         else:
@@ -121,6 +178,9 @@ class Librarian(object):
 
         :return: The name of the default repo. If no default, returns None.
         """
+
+        assert self.schema_interface
+
         if self.local_mode:
             return self.schema_interface.get_default_repo()
         else:
@@ -147,6 +207,8 @@ class Librarian(object):
                  if check_all_repos is True. False otherwise.
         """
 
+        assert self.schema_interface
+
         if self.local_mode:
             return self.schema_interface.file_is_within_repo(file_p,
                                                              repo_names,
@@ -167,8 +229,10 @@ class Librarian(object):
                  if check_all_repos is True. False otherwise.
         """
 
+        assert self.store_interface
+
         if self.local_mode:
-            return storeinterface.file_is_within_asset(file_p)
+            return self.store_interface.file_is_within_asset(file_p)
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
@@ -182,6 +246,8 @@ class Librarian(object):
         :return: True if the token is valid, false otherwise.
         """
 
+        assert self.schema_interface
+
         if self.local_mode:
             return self.schema_interface.token_is_valid(token, repo_n)
         else:
@@ -194,6 +260,8 @@ class Librarian(object):
 
         :return: The path where to gather the files
         """
+
+        assert self.schema_interface
 
         if self.local_mode:
             return self.schema_interface.get_gather_loc()
@@ -210,6 +278,8 @@ class Librarian(object):
         :return: The path where to store (probably versioned) copies of the
                  files.
         """
+
+        assert self.schema_interface
 
         if self.local_mode:
             return self.schema_interface.get_publish_loc(token, repo)
@@ -250,6 +320,8 @@ class Librarian(object):
         :return: Nothing.
         """
 
+        assert self.name_interface
+
         if self.local_mode:
             self.name_interface.set_attributes(item_n, repo_n)
             self.name_interface.validate_name()
@@ -269,6 +341,8 @@ class Librarian(object):
         :return: The metadata in the format of a tuple: token, desc, variant.
         """
 
+        assert self.name_interface
+
         if self.local_mode:
             self.name_interface.set_attributes(item_n, repo_n)
             return self.name_interface.extract_metadata_from_name()
@@ -287,6 +361,8 @@ class Librarian(object):
 
         :return: The metadata in the format of a tuple: token, desc, variant.
         """
+
+        assert self.name_interface
 
         if self.local_mode:
             self.name_interface.set_attributes(item_n, repo_n)
@@ -399,6 +475,9 @@ class Librarian(object):
 
         :return: Nothing.
         """
+
+        assert self.store_interface
+
         if self.local_mode:
 
             self.store_interface.set_attributes(
@@ -428,6 +507,8 @@ class Librarian(object):
                  is the path to the copied file.
         """
 
+        assert self.store_interface
+
         return self.store_interface.list_stored()
 
     # --------------------------------------------------------------------------
@@ -446,6 +527,8 @@ class Librarian(object):
 
         :return: Nothing.
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
@@ -479,6 +562,8 @@ class Librarian(object):
         :return: Nothing.
         """
 
+        assert self.store_interface
+
         if self.local_mode or local_mode:
 
             self.store_interface.set_attributes(
@@ -508,6 +593,8 @@ class Librarian(object):
 
         :return: Nothing.
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
@@ -539,6 +626,8 @@ class Librarian(object):
         :return: The version the pin points to..
         """
 
+        assert self.store_interface
+
         if self.local_mode or local_mode:
 
             self.store_interface.set_attributes(
@@ -568,6 +657,8 @@ class Librarian(object):
 
         :return: The version the pin points to..
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
@@ -600,6 +691,8 @@ class Librarian(object):
         :return: Nothing.
         """
 
+        assert self.store_interface
+
         if self.local_mode or local_mode:
 
             self.store_interface.set_attributes(
@@ -627,6 +720,8 @@ class Librarian(object):
 
         :return: The version the pin points to..
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
@@ -660,6 +755,8 @@ class Librarian(object):
         :return: The version the pin points to..
         """
 
+        assert self.store_interface
+
         if self.local_mode or local_mode:
 
             self.store_interface.set_attributes(
@@ -691,6 +788,8 @@ class Librarian(object):
 
         :return: The version the pin points to..
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
@@ -724,6 +823,8 @@ class Librarian(object):
         :return: The version the pin points to..
         """
 
+        assert self.store_interface
+
         if self.local_mode or local_mode:
 
             self.store_interface.set_attributes(
@@ -755,6 +856,8 @@ class Librarian(object):
 
         :return: The version the pin points to..
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
@@ -790,6 +893,8 @@ class Librarian(object):
 
         :return: The version the pin points to..
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
@@ -827,6 +932,8 @@ class Librarian(object):
         :return: The version the pin points to..
         """
 
+        assert self.store_interface
+
         if self.local_mode or local_mode:
 
             self.store_interface.set_attributes(
@@ -858,6 +965,8 @@ class Librarian(object):
 
         :return: The version the pin points to..
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
@@ -892,6 +1001,8 @@ class Librarian(object):
 
         :return: The version the pin points to..
         """
+
+        assert self.store_interface
 
         if self.local_mode or local_mode:
 
