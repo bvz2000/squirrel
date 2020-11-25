@@ -169,6 +169,7 @@ if __name__ == "__main__":
         sys.exit(107)
 
     opts.source = opts.source.rstrip("/")
+    opts.source = os.path.abspath(opts.source)
 
     # If there are thumbnails, get a list of those files from the spec provided.
     if opts.thumbnails:

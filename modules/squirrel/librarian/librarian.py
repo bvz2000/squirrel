@@ -237,6 +237,22 @@ class Librarian(object):
             raise SquirrelError("Remote operation not yet implemented.", 1)
 
     # --------------------------------------------------------------------------
+    def get_token_from_name(self,
+                            name):
+        """
+        Returns a token extracted from the asset name.
+
+        :return: The token extracted from the asset name.
+        """
+
+        assert self.schema_interface
+
+        if self.local_mode:
+            return self.schema_interface.get()
+        else:
+            raise SquirrelError("Remote operation not yet implemented.", 1)
+
+    # --------------------------------------------------------------------------
     def token_is_valid(self,
                        token,
                        repo_n=None):
@@ -786,7 +802,7 @@ class Librarian(object):
         :param local_mode: Whether to go through the repo system, or run
         locally.
 
-        :return: The version the pin points to..
+        :return: Nothing.
         """
 
         assert self.store_interface
@@ -798,6 +814,38 @@ class Librarian(object):
                 asset_parent_d=asset_p)
 
             return self.store_interface.delete_keywords(version, keywords)
+
+        else:
+            raise SquirrelError("Remote operation not yet implemented.", 1)
+
+    # --------------------------------------------------------------------------
+    def get_keywords(self,
+                     asset_p,
+                     asset_name,
+                     version,
+                     local_mode):
+        """
+        Deletes keywords from the given version of the given asset..
+
+        :param asset_p: The path to the parent directory in which the asset
+               lives (not the path to the asset itself).
+        :param asset_name: The name of the asset.
+        :param version: The version to list keywords of.
+        :param local_mode: Whether to go through the repo system, or run
+        locally.
+
+        :return: A list of keywords on this version of the asset.
+        """
+
+        assert self.store_interface
+
+        if self.local_mode or local_mode:
+
+            self.store_interface.set_attributes(
+                name=asset_name,
+                asset_parent_d=asset_p)
+
+            return self.store_interface.get_keywords(version)
 
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
@@ -999,7 +1047,7 @@ class Librarian(object):
         :param local_mode: Whether to go through the repo system, or run
         locally.
 
-        :return: The version the pin points to..
+        :return: The version the pin points to.
         """
 
         assert self.store_interface
@@ -1015,3 +1063,31 @@ class Librarian(object):
 
         else:
             raise SquirrelError("Remote operation not yet implemented.", 1)
+
+    # --------------------------------------------------------------------------
+    def list_assets_in_repo(self,
+                            repo,
+                            token,
+                            keywords):
+        """
+        Lists all of the assets within a repo, optionally limited to just the
+        subset within a specific token.
+
+        :param repo: The name of the repo to list assets in.
+        :param token: The token to limit the list to (optional)
+        :param keywords: Limit the result to those assets that contain these keywords (a list)
+
+        :return: A list of asset names including all of the metadata for each
+                 of these assets.
+        """
+
+        assert self.store_interface
+        assert self.schema_interface
+
+        if keywords:
+            assert type(keywords) is list
+
+        if not repo:
+            repo = self.schema_interface.get_default_repo()
+
+        return self.schema_interface.list_assets_in_repo(repo, token, keywords)

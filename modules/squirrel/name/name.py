@@ -69,7 +69,7 @@ class Name(object):
         self.config_p = os.path.join(config_d, "name.config")
         self.config_p = os.path.abspath(self.config_p)
         self.config_obj = config.Config(self.config_p,
-                                        envvars.SQUIRREL_STORE_CONFIG_PATH)
+                                        envvars.SQUIRREL_NAME_CONFIG_PATH)
 
         self.validate_config()
 

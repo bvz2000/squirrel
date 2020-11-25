@@ -124,7 +124,7 @@ class Asset(object):
         self.config_p = os.path.join(config_d, "store.config")
         self.config_p = os.path.abspath(self.config_p)
         self.config_obj = config.Config(self.config_p,
-                                        envvars.SQUIRREL_NAME_CONFIG_PATH)
+                                        envvars.SQUIRREL_STORE_CONFIG_PATH)
 
         self.validate_config()
 
@@ -715,6 +715,23 @@ class Asset(object):
         meta_obj = meta.Metadata(self.language)
         meta_obj.set_attributes(self.asset_d, version)
         meta_obj.delete_keywords(version, keywords)
+
+    # --------------------------------------------------------------------------
+    def get_keywords(self,
+                     version):
+        """
+        Lists the keywords for a specified version.
+
+        :param version: The version on which to set the metadata.
+
+        :return: A list of keywords
+        """
+
+        assert libSquirrel.validate_version(version, "v", 4)
+
+        meta_obj = meta.Metadata(self.language)
+        meta_obj.set_attributes(self.asset_d, version)
+        return meta_obj.get_keywords_from_ver(version)
 
     # --------------------------------------------------------------------------
     def add_metadata(self,

@@ -1,6 +1,7 @@
 import ConfigParser
 import inspect
 import os
+import sys
 import tempfile
 
 from bvzlib import config
@@ -39,8 +40,12 @@ class RepoManager(object):
 
         self.config_p = os.path.join(config_d, "schema.config")
         self.config_p = os.path.abspath(self.config_p)
-        self.config_obj = config.Config(self.config_p,
-                                        envvars.SQUIRREL_SCHEMA_CONFIG_PATH)
+        try:
+            self.config_obj = config.Config(self.config_p,
+                                            envvars.SQUIRREL_SCHEMA_CONFIG_PATH)
+        except IOError as e:
+            print("Unable to open the schema config file. " + str(e))
+            sys.exit(1)
 
         self.store_interface = storeinterface.StoreInterface(language)
 
@@ -283,7 +288,11 @@ class RepoManager(object):
         if self.config_obj.has_option("repos", repo_n):
             self.config_obj.remove_option("repos", repo_n)
 
-        self.config_obj.save()
+        try:
+            self.config_obj.save()
+        except IOError as err:
+            print(err)
+            sys.exit(1)
 
     # --------------------------------------------------------------------------
     def remove_repo(self,
@@ -420,6 +429,28 @@ class RepoManager(object):
             err = self.resc.error(102)
             err.msg = err.msg.format(repo_name=repo_n)
             raise SquirrelError(err.msg, 102)
+
+    # --------------------------------------------------------------------------
+    def list_asset_names_in_repo(self,
+                                 repo_n,
+                                 token,
+                                 keywords):
+        """
+        Given a repo name, list all of the asset names in that repo.
+
+        :param repo_n: The name of the repo.
+        :param token: An optional token to limit the list of assets.
+        :param keywords: An optional list of keywords to filter on.
+
+        :return: A list containing all of the asset names.
+        """
+
+        assert type(repo_n) is str and repo_n
+        if keywords:
+            assert type(keywords) is list
+
+        repo_obj = self.repos[repo_n]
+        return repo_obj.list_asset_names(token, keywords)
 
     # --------------------------------------------------------------------------
     def bless_dir(self,
@@ -764,3 +795,15 @@ class RepoManager(object):
         repo_obj = self.get_repo(repo_n)
 
         return repo_obj.token_is_leaf(token)
+
+    # --------------------------------------------------------------------------
+    def list_assets(self,
+                    token=None,
+                    repo_n=None):
+        """
+        Lists all of the assets in a repo. If the token is anything other than None,
+        then only those assets which are a subset of this token will be listed.
+
+
+        """
+        pass

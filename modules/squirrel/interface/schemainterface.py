@@ -1,5 +1,5 @@
 
-from squirrel.schema import manager
+from squirrel.schema import repomanager
 
 
 # ==============================================================================
@@ -27,7 +27,7 @@ class SchemaInterface(object):
         :return: Nothing.
         """
 
-        self.repo_manager_obj = manager.RepoManager(language)
+        self.repo_manager_obj = repomanager.RepoManager(language)
 
     # --------------------------------------------------------------------------
     def list_repos(self):
@@ -65,6 +65,15 @@ class SchemaInterface(object):
     def add_repo_to_config(self,
                            repo_p):
         self.repo_manager_obj.add_repo_to_config(repo_p)
+
+    # --------------------------------------------------------------------------
+    def list_assets_in_repo(self,
+                            repo_n,
+                            token,
+                            keywords):
+        return self.repo_manager_obj.list_asset_names_in_repo(repo_n,
+                                                              token,
+                                                              keywords)
 
     # --------------------------------------------------------------------------
     def file_is_within_repo(self,

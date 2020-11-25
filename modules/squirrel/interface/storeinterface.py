@@ -117,6 +117,11 @@ class StoreInterface(object):
         return self.asset_obj.delete_keywords(version, keywords)
 
     # --------------------------------------------------------------------------
+    def get_keywords(self,
+                     version):
+        return self.asset_obj.get_keywords(version)
+
+    # --------------------------------------------------------------------------
     def add_metadata(self,
                      version,
                      metadata):
@@ -152,3 +157,7 @@ class StoreInterface(object):
                          version,
                          poster_frame=None):
         self.asset_obj.set_poster_frame(version, poster_frame)
+
+    # # --------------------------------------------------------------------------
+    # def list_assets(self,):
+    #     self..set_poster_frame(version, poster_frame)

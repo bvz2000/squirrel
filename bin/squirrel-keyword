@@ -36,11 +36,12 @@ from squirrel.librarian import librarian
 from squirrel.shared.squirrelerror import SquirrelError
 
 OPTIONS = [
-    "asset_name",
     "token",
+    "asset_name",
     "version",
     "keywords",
     "delete",
+    "list",
     "repo",
     "local_mode",
     "language",
@@ -63,7 +64,7 @@ def validate_options():
         print(error.msg)
         sys.exit(102)
 
-    if not opts.keywords and not opts.delete:
+    if not opts.keywords and not opts.delete and not opts.list:
         msg = resc.message("no_keywords")
         print(msg)
         sys.exit(0)
@@ -106,25 +107,22 @@ if __name__ == "__main__":
     if not opts.repo:
         opts.repo = None
 
+    if opts.local_mode and not opts.token:
+        token_error = resc.error(104)
+        token_error.msg = token_error.msg.format(version=opts.version)
+        print(token_error.msg)
+        sys.exit(104)
+
     try:
 
-        if opts.local_mode:
+        librarian = librarian.Librarian(init_name=True,
+                                        init_schema=True,
+                                        init_store=True,
+                                        language=opts.language)
 
-            librarian = librarian.Librarian(init_name=False,
-                                            init_schema=False,
-                                            init_store=True,
-                                            language=opts.language)
-
-            asset_parent_p = opts.token
-
-        else:
-
-            librarian = librarian.Librarian(init_name=False,
-                                            init_schema=True,
-                                            init_store=True,
-                                            language=opts.language)
-
-            asset_parent_p = librarian.get_publish_loc(opts.token, opts.repo)
+        if not opts.token:
+            opts.token = librarian.extract_token_from_name(opts.asset_name)
+        asset_parent_p = librarian.get_publish_loc(opts.token, opts.repo)
 
         # If no version was given, get the highest version
         if not opts.version:
@@ -135,17 +133,34 @@ if __name__ == "__main__":
 
         validate_options()
 
-        librarian.add_keywords(asset_parent_p,
-                               opts.asset_name,
-                               opts.version,
-                               opts.keywords,
-                               opts.local_mode)
+        if not (os.path.exists(os.path.join(asset_parent_p, opts.asset_name))):
+            path_error = resc.error(100)
+            path_error.msg = path_error.msg.format(asset_path=os.path.join(asset_parent_p, opts.asset_name))
+            print(path_error.msg)
+            sys.exit(102)
 
-        librarian.delete_keywords(asset_parent_p,
-                                  opts.asset_name,
-                                  opts.version,
-                                  opts.delete,
-                                  opts.local_mode)
+        if opts.keywords:
+            librarian.add_keywords(asset_parent_p,
+                                   opts.asset_name,
+                                   opts.version,
+                                   opts.keywords,
+                                   opts.local_mode)
+
+        if opts.delete:
+            librarian.delete_keywords(asset_parent_p,
+                                      opts.asset_name,
+                                      opts.version,
+                                      opts.delete,
+                                      opts.local_mode)
+
+        if opts.list:
+            keywords = librarian.get_keywords(asset_parent_p,
+                                              opts.asset_name,
+                                              opts.version,
+                                              opts.local_mode)
+            if keywords:
+                for keyword in keywords:
+                    print(keyword)
 
     except SquirrelError as e:
         print(e.message)

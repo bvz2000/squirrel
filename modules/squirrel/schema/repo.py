@@ -451,13 +451,15 @@ class Repo(object):
 
     # --------------------------------------------------------------------------
     def list_asset_paths(self,
-                         token=""):
+                         token="",
+                         keywords=None):
         """
         Returns a list of all the asset paths under the token given by token. If
         the token is not valid, raise an error.
 
         :param token: A relative path from the root of the repo. Defaults to
                "" which means the repo root (i.e. list all assets in the repo).
+        :param keywords: An optional list of keywords to filter the results on.
 
         :return: A list of asset paths
         """
@@ -472,27 +474,38 @@ class Repo(object):
         output = list()
         repo_d = self.get_path_from_token(token)
 
-        for dir_d, files_n, dirs_n in os.walk(repo_d):
+        for dir_d, dirs_n, files_n in os.walk(repo_d):
             if self.store_interface.path_is_asset_root(dir_d):
-                output.append(dir_d.rstrip(os.path.sep) + os.path.sep)
+                if keywords:
+                    keyword_p = os.path.join(dir_d, ".CURRENT", "keywords")
+                    with open(keyword_p, "r") as f:
+                        asset_keywords = f.readlines()
+                    for keyword in keywords:
+                        if keyword + "\n" in asset_keywords:
+                            output.append(dir_d.rstrip(os.path.sep) + os.path.sep)
+                else:
+                    output.append(dir_d.rstrip(os.path.sep) + os.path.sep)
+                dirs_n[:] = []
         return output
 
     # --------------------------------------------------------------------------
     def list_asset_names(self,
-                         token=""):
+                         token="",
+                         keywords=None):
         """
         Returns a list of all the asset names under the token given by token. If
         the token is not valid, raise an error.
 
         :param token: A relative path from the root of the repo. Defaults to
                "" which means the repo root (i.e. list all assets in the repo).
+        :param keywords: An optional list of keywords to filter on.
 
         :return: A list of asset paths
         """
 
         output = list()
 
-        assets_p = self.list_asset_paths(token)
+        assets_p = self.list_asset_paths(token, keywords)
         for asset_p in assets_p:
             output.append(os.path.split(asset_p.rstrip("/"))[1])
 
