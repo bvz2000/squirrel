@@ -1,134 +1,3736 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 
-"""
-License
---------------------------------------------------------------------------------
-Squirrel is released under version 3 of the GNU General Public License.
-
-squirrel
-Copyright (C) 2019  Bernhard VonZastrow
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
-
-from __future__ import print_function
-
-from __future__ import print_function
-
+from argparse import ArgumentParser, RawTextHelpFormatter
+from datetime import datetime
+import getpass
 import inspect
-import os
+import os.path
+import re
 import sys
+import textwrap as textwrap
+import time
 
-from bvzlib import options
-from bvzlib import resources
+from squirrel.repo.repomanager import RepoManager
+from bvzlocalizationerror import LocalizationError
+from bvzlocalization import LocalizedResource
+from squirrel.shared.squirrelerror import SquirrelError
+from squirrel.shared import setupconfig
+from squirrel.shared import constants
 
-OPTIONS = [
-    "sub_command",
-    "list_sub_commands",
-    "language",
-]
+# TODO: Remove the success strings from the run subtask functions
+# TODO: MAKE SURE EVERYTHING IS LOGGED
 
 
-# ------------------------------------------------------------------------------
-def validate_options():
+# ======================================================================================================================
+class PreserveWhiteSpaceWrapRawTextHelpFormatter(RawTextHelpFormatter):
+
+    def _split_lines(self, text, width):
+        text_rows = text.splitlines()
+        for idx, line in enumerate(text_rows):
+            search = re.search(r'\s*[0-9\-]{0,}\.?\s*', line)
+            if line.strip() is "":
+                text_rows[idx] = " "
+            elif search:
+                lines = [x for i, x in enumerate(textwrap.wrap(line, width))]
+                text_rows[idx] = lines
+
+        return [item for sublist in text_rows for item in sublist]
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def get_language():
     """
-    Validates that the options passed are internally consistent,and complete.
+    Looks to see if the -l or --language flags are included in the sys.argv. We do this prior to using the argparse
+    functionality because the result of this will control how the argparse behaves.
 
-    :return: Nothing.
+    :return:
+            The language string if the user provided it. If they did not, returns "english"
     """
 
-    pass
-
-
-# ==============================================================================
-if __name__ == "__main__":
-
-    app_name = os.path.split(sys.argv[0])[1]
-
-    # Extract the language from the sys.argv if it is there
     language = "english"
-    if "-language" in sys.argv:
-        idx = sys.argv.index("-language")
-        try:
-            language = sys.argv[idx]
-        except IndexError:
-            pass
+
+    language_index = None
+    if "-l" in sys.argv:
+        language_index = sys.argv.index("-l")
+    if "--language" in sys.argv:
+        language_index = sys.argv.index("--language")
+    if language_index is not None:
+        language = sys.argv[language_index + 1]
+
+    return language
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def create_localization_object(language):
+    """
+    Create a localization object.
+
+    :param language:
+            The language to use for this resource.
+
+    :return:
+            A localization object.
+    """
+
+    module_d = os.path.split(inspect.stack()[0][1])[0]
+    resources_d = os.path.abspath(os.path.join(module_d, "..", "resources"))
+    try:
+        return LocalizedResource(resources_d, "squirrel", language)
+    except LocalizationError as err:
+        print(err.message)
+        sys.exit(err.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def create_config_object(language):
+    """
+    Create a config object.
+
+    :param language:
+            The language to use for this resource.
+
+    :return:
+            A localization object.
+    """
 
     module_d = os.path.split(inspect.stack()[0][1])[0]
     resources_d = os.path.join(module_d, "..", "resources")
-    resc = resources.Resources(resources_d, "bin_squirrel", language)
-
-    sub_commands = list()
-    files_n = os.listdir(module_d)
-    for file_n in files_n:
-        if file_n.startswith("squirrel-"):
-            sub_commands.append(file_n.split("-")[1])
-    sub_commands.sort()
-
-    local_args = list()
-    sub_command_args = list()
-    local_mode = True
-    for arg in sys.argv[1:]:
-        if arg in sub_commands:
-            local_args.append(arg)
-            local_mode = False
-            continue
-        if local_mode:
-            local_args.append(arg)
-        else:
-            sub_command_args.append(arg)
-
-    # If NO args were passed, act as though -L were passed.
-    if len(sys.argv) == 1:
-        local_args.append("-L")
-
-    # There must ALWAYS be a sub-command even if we don't actually use it.
-    if "-L" in local_args or "--list-sub-commands" in local_args:
-        found = False
-        for arg in local_args:
-            if not arg.startswith("-"):
-                found = True
-        if not found:
-            local_args.append("placeholder_sub_command")
-
-    # Create and initialize the options object
     try:
-        opts_obj = options.Options(OPTIONS, resc, local_args, language)
-    except ValueError as error:
-        print(error)
-        sys.exit()
+        return LocalizedResource(resources_d, "squirrel", language)
+    except LocalizationError as err:
+        print(err.message)
+        sys.exit(err.code)
 
-    opts = opts_obj.opts
-    sys.argv = opts_obj.args
 
-    # Validate the inputs
-    validate_options()
+# ----------------------------------------------------------------------------------------------------------------------
+def initial_parser_setup(localization_obj):
+    """
+    Sets up the top-level arguments parser.
 
-    if opts.list_sub_commands:
-        msg = resc.message("list_sub_commands")
-        msg = msg.format(app_name=app_name)
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language.
+
+    :return:
+            The parsed args.
+    """
+
+    # TODO: Add the following functions:
+    #  add thumbnails,
+    #  list thumbnails,
+    #  delete thumbnails,
+    #  publish asset,
+    #  flatten asset,
+    #  list asset disk space usage,
+    #  delete asset version
+    #  add log,
+    #  display log
+
+    parser = ArgumentParser(formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter)
+
+    description = "\n".join(textwrap.wrap(localization_obj.get_msg("initial_parser_subtask_helpstr"), 70))
+    sub_parser = parser.add_subparsers(title="sub-tasks",
+                                       metavar="sub-task",
+                                       dest="sub_task",
+                                       required=True,
+                                       description=description)
+
+    # make-repo -------------------------------------
+    help_str = localization_obj.get_msg("make_repo_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="make-repo",
+                                           aliases=['mr'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_make_repo_parser(sub_parser=sub_parser_obj,
+                           localization_obj=localization_obj)
+
+    # add-repo -------------------------------------
+    help_str = localization_obj.get_msg("add_repo_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="add-repo",
+                                           aliases=['ar'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_add_repo_parser(sub_parser=sub_parser_obj,
+                          localization_obj=localization_obj)
+
+    # remove-repo -------------------------------------
+    help_str = localization_obj.get_msg("remove_repo_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="remove-repo",
+                                           aliases=['remr'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_remove_repo_parser(sub_parser=sub_parser_obj,
+                             localization_obj=localization_obj)
+
+    # rebuild-repo -------------------------------------
+    help_str = localization_obj.get_msg("rebuild_repo_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="rebuild-repo",
+                                           aliases=['rr'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_rebuild_repo_parser(sub_parser=sub_parser_obj,
+                              localization_obj=localization_obj)
+
+    # list-repos -------------------------------------
+    help_str = localization_obj.get_msg("list_repos_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-repos",
+                                           aliases=['lr'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_repos_parser(sub_parser=sub_parser_obj,
+                            localization_obj=localization_obj)
+
+    # list-missing-repos -------------------------------------
+    help_str = localization_obj.get_msg("list_missing_repos_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-missing_repos",
+                                           aliases=['lmr'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_missing_repos_parser(sub_parser=sub_parser_obj,
+                                    localization_obj=localization_obj)
+
+    # remove-missing-repos -------------------------------------
+    help_str = localization_obj.get_msg("remove_missing_repos_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="remove-missing_repos",
+                                           aliases=['rmr'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_remove_missing_repos_parser(sub_parser=sub_parser_obj,
+                                      localization_obj=localization_obj)
+
+    # list-default-repo -------------------------------------
+    help_str = localization_obj.get_msg("list_default_repo_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-default-repo",
+                                           aliases=['ldr'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_default_repo_parser(sub_parser=sub_parser_obj,
+                                   localization_obj=localization_obj)
+
+    # set-default-repo -------------------------------------
+    help_str = localization_obj.get_msg("set_default_repo_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="set-default-repo",
+                                           aliases=['sdr'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_set_default_repo_parser(sub_parser=sub_parser_obj,
+                                  localization_obj=localization_obj)
+
+    # update-repo-caches -------------------------------------
+    help_str = localization_obj.get_msg("update_repo_caches_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="update-repo-caches",
+                                           aliases=['urc'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_update_repo_caches_parser(sub_parser=sub_parser_obj,
+                                    localization_obj=localization_obj)
+
+    # list-assets -------------------------------------
+    help_str = localization_obj.get_msg("list_assets_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-assets",
+                                           aliases=['la'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_assets_parser(sub_parser=sub_parser_obj,
+                             localization_obj=localization_obj)
+
+    # list-keywords -------------------------------------
+    help_str = localization_obj.get_msg("list_keywords_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-keywords",
+                                           aliases=['lk'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_keywords_parser(sub_parser=sub_parser_obj,
+                               localization_obj=localization_obj)
+
+    # add-keywords -------------------------------------
+    help_str = localization_obj.get_msg("add_keywords_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="add-keywords",
+                                           aliases=['ak'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_add_keywords_parser(sub_parser=sub_parser_obj,
+                              localization_obj=localization_obj)
+
+    # delete-keywords -------------------------------------
+    help_str = localization_obj.get_msg("delete_keywords_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-keywords",
+                                           aliases=['dk'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_keywords_parser(sub_parser=sub_parser_obj,
+                                 localization_obj=localization_obj)
+
+    # delete-all-keywords -------------------------------------
+    help_str = localization_obj.get_msg("delete_all_keywords_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-all-keywords",
+                                           aliases=['dak'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_all_keywords_parser(sub_parser=sub_parser_obj,
+                                     localization_obj=localization_obj)
+
+    # list-metadata -------------------------------------
+    help_str = localization_obj.get_msg("list_metadata_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-metadata",
+                                           aliases=['lm'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_metadata_parser(sub_parser=sub_parser_obj,
+                               localization_obj=localization_obj)
+
+    # add-metadata -------------------------------------
+    help_str = localization_obj.get_msg("add_metadata_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="add-metadata",
+                                           aliases=['am'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_add_metadata_parser(sub_parser=sub_parser_obj,
+                              localization_obj=localization_obj)
+
+    # delete-metadata -------------------------------------
+    help_str = localization_obj.get_msg("delete_metadata_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-metadata",
+                                           aliases=['dm'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_metadata_parser(sub_parser=sub_parser_obj,
+                                 localization_obj=localization_obj)
+
+    # delete-all-metadata -------------------------------------
+    help_str = localization_obj.get_msg("delete_all_metadata_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-all-metadata",
+                                           aliases=['dam'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_all_metadata_parser(sub_parser=sub_parser_obj,
+                                     localization_obj=localization_obj)
+
+    # list-version-notes -------------------------------------
+    help_str = localization_obj.get_msg("list_version_notes_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-version-notes",
+                                           aliases=['lvn'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_version_notes_parser(sub_parser=sub_parser_obj,
+                                    localization_obj=localization_obj)
+
+    # add-version-notes -------------------------------------
+    help_str = localization_obj.get_msg("add_version_notes_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="add-version-notes",
+                                           aliases=['avn'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_add_version_notes_parser(sub_parser=sub_parser_obj,
+                                   localization_obj=localization_obj)
+
+    # delete-version-notes -------------------------------------
+    help_str = localization_obj.get_msg("delete_version_notes_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-version-notes",
+                                           aliases=['dvn'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_version_notes_parser(sub_parser=sub_parser_obj,
+                                      localization_obj=localization_obj)
+
+    # list-version-notes -------------------------------------
+    help_str = localization_obj.get_msg("list_asset_notes_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-asset-notes",
+                                           aliases=['lan'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_asset_notes_parser(sub_parser=sub_parser_obj,
+                                  localization_obj=localization_obj)
+
+    # add-version-notes -------------------------------------
+    help_str = localization_obj.get_msg("add_asset_notes_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="add-asset-notes",
+                                           aliases=['aan'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_add_asset_notes_parser(sub_parser=sub_parser_obj,
+                                 localization_obj=localization_obj)
+
+    # delete-version-notes -------------------------------------
+    help_str = localization_obj.get_msg("delete_asset_notes_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-asset-notes",
+                                           aliases=['dan'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_asset_notes_parser(sub_parser=sub_parser_obj,
+                                    localization_obj=localization_obj)
+
+    # add-thumbnails -----------------------------------------
+    help_str = localization_obj.get_msg("add_thumbnails_help")
+    sub_parser_obj = sub_parser.add_parser(name="add-thumbnails",
+                                           aliases=['at'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_add_thumbnails_parser(sub_parser=sub_parser_obj,
+                                localization_obj=localization_obj)
+
+    # set-pin -----------------------------------------
+    help_str = localization_obj.get_msg("set_pin_help")
+    sub_parser_obj = sub_parser.add_parser(name="set-pin",
+                                           aliases=['sp'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_set_pin_parser(sub_parser=sub_parser_obj,
+                         localization_obj=localization_obj)
+
+    # delete-pin -----------------------------------------
+    help_str = localization_obj.get_msg("delete_pin_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-pin",
+                                           aliases=['dp'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_pin_parser(sub_parser=sub_parser_obj,
+                            localization_obj=localization_obj)
+
+    # # add-log
+    # help_str = localization_obj.get_msg("append_log_help")
+    # append_log_parser = sub_parser.add_parser(name="append-log",
+    #                                           aliases=['al'],
+    #                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+    #                                           help=help_str)
+    # setup_append_log_parser(sub_parser=append_log_parser,
+    #                         localization_obj=localization_obj,
+    #                         name_required=asset_name_required,
+    #                         asset_parent_path_required=asset_parent_path_required)
+    #
+    # # display-log
+    # help_str = localization_obj.get_msg("display_log_help")
+    # display_log_parser = sub_parser.add_parser(name="display-log",
+    #                                            aliases=['dl'],
+    #                                            formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+    #                                            help=help_str)
+    # setup_display_log_parser(sub_parser=display_log_parser,
+    #                          localization_obj=localization_obj,
+    #                          name_required=asset_name_required,
+    #                          asset_parent_path_required=asset_parent_path_required)
+    #
+    # # delete-version
+    # help_str = localization_obj.get_msg("delete_version_help")
+    # delete_version_parser = sub_parser.add_parser(name="delete-version",
+    #                                               aliases=['dv'],
+    #                                               formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+    #                                               help=help_str)
+    # setup_delete_version_parser(sub_parser=delete_version_parser,
+    #                             localization_obj=localization_obj,
+    #                             name_required=asset_name_required,
+    #                             asset_parent_path_required=asset_parent_path_required)
+    #
+    # # collapse-asset
+    # help_str = localization_obj.get_msg("collapse_asset_help")
+    # collapse_asset_parser = sub_parser.add_parser(name="collapse-asset",
+    #                                               aliases=['ca'],
+    #                                               formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+    #                                               help=help_str)
+    # setup_collapse_asset_parser(sub_parser=collapse_asset_parser,
+    #                             localization_obj=localization_obj,
+    #                             name_required=asset_name_required,
+    #                             asset_parent_path_required=asset_parent_path_required)
+
+    help_str = localization_obj.get_msg("postfix_language_helpstr")
+    parser.add_argument("-l",
+                        "--language",
+                        type=str,
+                        help=help_str)
+
+    args = parser.parse_args()
+
+    return args
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_shared_repo_option(sub_parser,
+                             localization_obj):
+    """
+    Adds the --repo option to the sub-parser
+
+    :param sub_parser:
+            The sub-parser object to which we will add the --repo option.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+    # TODO: REMOVE THIS FUNCTION
+    return
+    help_str = localization_obj.get_msg("prefix_repo_name_optional_helpstr")
+    sub_parser.add_argument("-r",
+                            "--repo",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_shared_asset_name_option(sub_parser,
+                                   localization_obj):
+    """
+    Adds the --asset-name (-a) option and the --uri (-u) option to the sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add the --asset-name and --uri-path options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("prefix_asset_name_required_helpstr")
+    sub_parser.add_argument("-a",
+                            "--asset-name",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("prefix_uri_optional_helpstr")
+    sub_parser.add_argument("-u",
+                            "--uri",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_shared_uri_option(sub_parser,
+                            localization_obj):
+    """
+    Adds the require the --uri (-u) option to the sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add the --asset-name and --uri-path options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("prefix_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_shared_sub_parser_postfix(sub_parser,
+                                    localization_obj):
+    """
+    Sets up the shared arguments sub-parser (i.e. args that every sub-parser uses). These are the args that come at the
+    end of the list of options (postfix). There is a separate function for args that come at the beginning of the list.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("postfix_repo_list_path_helpstr")
+    help_str = help_str.format(env=constants.REPO_LIST_PATH_ENV_VAR)
+    sub_parser.add_argument("-R",
+                            metavar="repo-list-path",
+                            dest="repo_list_path",
+                            type=str,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("postfix_config_path_helpstr")
+    help_str = help_str.format(env=constants.CONFIG_PATH_ENV_VAR)
+    sub_parser.add_argument("-c",
+                            metavar="config-file",
+                            dest="config_path",
+                            type=str,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("postfix_language_helpstr")
+    sub_parser.add_argument("-l",
+                            action="store_true",
+                            help=help_str)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_make_repo_parser(sub_parser,
+                           localization_obj):
+    """
+    Sets up the make repo sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("make_repo_directory_required_helpstr")
+    sub_parser.add_argument("-d",
+                            "--directory",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_add_repo_parser(sub_parser,
+                          localization_obj):
+    """
+    Sets up the add repo sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("add_repo_directory_required_helpstr")
+    sub_parser.add_argument("-d",
+                            "--directory",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_remove_repo_parser(sub_parser,
+                             localization_obj):
+    """
+    Sets up the remove repo sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("remove_repo_name_required_helpstr")
+    sub_parser.add_argument("-r",
+                            "--repo-name",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_rebuild_repo_parser(sub_parser,
+                              localization_obj):
+    """
+    Sets up the rebuild repo sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("rebuild_repo_name_required_helpstr")
+    sub_parser.add_argument("-r",
+                            "--repo-name",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_repos_parser(sub_parser,
+                            localization_obj):
+    """
+    Sets up the list repos sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("list_repos_include_paths_optional_helpstr")
+    sub_parser.add_argument("-i",
+                            "--include-paths",
+                            action="store_true",
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_missing_repos_parser(sub_parser,
+                                    localization_obj):
+    """
+    Sets up the list repos sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("list_missing_repos_include_paths_optional_helpstr")
+    sub_parser.add_argument("-i",
+                            "--include-paths",
+                            action="store_true",
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_remove_missing_repos_parser(sub_parser,
+                                      localization_obj):
+    """
+    Sets up the list repos sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_default_repo_parser(sub_parser,
+                                   localization_obj):
+    """
+    Sets up the list default repo sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("list_default_repo_include_paths_optional_helpstr")
+    sub_parser.add_argument("-i",
+                            "--include-path",
+                            action="store_true",
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_set_default_repo_parser(sub_parser,
+                                  localization_obj):
+    """
+    Sets up the set default repo sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("set_default_repo_name_required_helpstr")
+    sub_parser.add_argument("-r",
+                            "--repo",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_update_repo_caches_parser(sub_parser,
+                                    localization_obj):
+    """
+    Sets up the update repo caches sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("update_repo_caches_optional_uri")
+    sub_parser.add_argument("-u",
+                            dest="uri",
+                            default=None,
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_assets_parser(sub_parser,
+                             localization_obj):
+    """
+    Sets up the list assets sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    setup_shared_repo_option(sub_parser, localization_obj)
+
+    help_str = localization_obj.get_msg("list_assets_uri_path_optional_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("list_assets_keywords_optional_helpstr")
+    sub_parser.add_argument("-k",
+                            metavar="keywords",
+                            dest="keywords",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("list_assets_metadata_keys_optional_helpstr")
+    sub_parser.add_argument("-m",
+                            metavar="metadata",
+                            dest="metadata_keys",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("list_assets_metadata_keys_and_values_optional_helpstr")
+    sub_parser.add_argument("-M",
+                            metavar="metadata-keys-and-values",
+                            dest="metadata_keys_and_values",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("list_assets_keyword_and_optional_helpstr")
+    sub_parser.add_argument("-a",
+                            dest="keywords_and",
+                            action="store_true",
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("list_assets_metadata_and_optional_helpstr")
+    sub_parser.add_argument("-A",
+                            dest="metadata_and",
+                            action="store_true",
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("list_assets_formatting_optional_helpstr")
+    sub_parser.add_argument("-f",
+                            metavar="formatting-string",
+                            dest="format",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_add_keywords_parser(sub_parser,
+                              localization_obj):
+    """
+    Sets up the add keywords sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("add_keywords_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_keywords_keywords_required_helpstr")
+    sub_parser.add_argument("-k",
+                            metavar="keywords",
+                            dest="keywords",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_keywords_parser(sub_parser,
+                                 localization_obj):
+    """
+    Sets up the delete keywords sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_keywords_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("delete_keywords_keywords_required_helpstr")
+    sub_parser.add_argument("-k",
+                            metavar="keywords",
+                            dest="keywords",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_all_keywords_parser(sub_parser,
+                                     localization_obj):
+    """
+    Sets up the delete keywords sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_all_keywords_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_keywords_parser(sub_parser,
+                               localization_obj):
+    """
+    Sets up the list keywords sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    setup_shared_repo_option(sub_parser, localization_obj)
+
+    help_str = localization_obj.get_msg("list_keywords_uri_paths_optional_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_add_metadata_parser(sub_parser,
+                              localization_obj):
+    """
+    Sets up the add metadata sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("add_metadata_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_metadata_metadata_required_helpstr")
+    sub_parser.add_argument("-m",
+                            metavar="metadata",
+                            dest="metadata",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_metadata_parser(sub_parser,
+                                 localization_obj):
+    """
+    Sets up the delete metadata sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_metadata_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("delete_metadata_metadata_required_helpstr")
+    sub_parser.add_argument("-m",
+                            metavar="metadata",
+                            dest="metadata",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_all_metadata_parser(sub_parser,
+                                     localization_obj):
+    """
+    Sets up the delete metadata sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_all_metadata_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_metadata_parser(sub_parser,
+                               localization_obj):
+    """
+    Sets up the list metadata sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    setup_shared_repo_option(sub_parser, localization_obj)
+
+    help_str = localization_obj.get_msg("list_metadata_uri_paths_optional_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            default=None,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_add_version_notes_parser(sub_parser,
+                                   localization_obj):
+    """
+    Sets up the add version notes sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("add_version_notes_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_version_notes_notes_required_helpstr")
+    sub_parser.add_argument("-n",
+                            metavar="notes",
+                            dest="notes",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_version_notes_version_optional_helpstr")
+    sub_parser.add_argument("-v",
+                            metavar="version",
+                            dest="version",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_version_notes_overwrite_optional_helpstr")
+    sub_parser.add_argument("-o",
+                            "--overwrite",
+                            action="store_true",
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_version_notes_parser(sub_parser,
+                                      localization_obj):
+    """
+    Sets up the delete version notes sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_version_notes_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("delete_version_notes_version_optional_helpstr")
+    sub_parser.add_argument("-v",
+                            "--version",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_version_notes_parser(sub_parser,
+                                    localization_obj):
+    """
+    Sets up the list version notes sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("list_version_notes_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("list_version_notes_version_optional_helpstr")
+    sub_parser.add_argument("-v",
+                            metavar="version",
+                            dest="version",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_add_asset_notes_parser(sub_parser,
+                                 localization_obj):
+    """
+    Sets up the add asset notes sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("add_asset_notes_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_asset_notes_notes_required_helpstr")
+    sub_parser.add_argument("-n",
+                            metavar="notes",
+                            dest="notes",
+                            nargs="+",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_asset_notes_overwrite_optional_helpstr")
+    sub_parser.add_argument("-o",
+                            "--overwrite",
+                            action="store_true",
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_asset_notes_parser(sub_parser,
+                                    localization_obj):
+    """
+    Sets up the delete asset notes sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_asset_notes_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_asset_notes_parser(sub_parser,
+                                  localization_obj):
+    """
+    Sets up the list asset notes sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("list_asset_notes_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_add_thumbnails_parser(sub_parser,
+                                localization_obj):
+    """
+    Sets up the add thumbnails sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("add_thumbnails_notes_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_thumbnails_thumbnail_files_required_helpstr")
+    sub_parser.add_argument("-t",
+                            metavar="thumbnails",
+                            dest="thumbnails_p",
+                            nargs="+",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_thumbnails_poster_frame_num_optional_helpstr")
+    sub_parser.add_argument("-p",
+                            metavar="poster-frame-num",
+                            dest="poster_frame_num",
+                            type=int,
+                            required=False,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_thumbnails_version_optional_helpstr")
+    sub_parser.add_argument("-v",
+                            "--version",
+                            type=str,
+                            required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_set_pin_parser(sub_parser,
+                         localization_obj):
+    """
+    Sets up the set pin sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("set_pin_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("set_pin_pin_required_helpstr")
+    sub_parser.add_argument("-p",
+                            metavar="pin",
+                            dest="pin",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("set_pin_version_required_helpstr")
+    sub_parser.add_argument("-v",
+                            metavar="version",
+                            dest="version",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_pin_parser(sub_parser,
+                            localization_obj):
+    """
+    Sets up the delete pin sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_pin_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("delete_pin_pin_required_helpstr")
+    sub_parser.add_argument("-p",
+                            metavar="pin",
+                            dest="pin",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+# # ----------------------------------------------------------------------------------------------------------------------
+# def setup_quickstore_parser(sub_parser,
+#                             localization_obj,
+#                             config_obj):
+#     """
+#     Sets up the quickstore arguments sub-parser.
+#
+#     :param sub_parser:
+#             The sub-parser object to which we will add options.
+#     :param localization_obj:
+#             The localization object that contains all of the help strings in the appropriate language
+#     :param config_obj:
+#             The config object responsible for reading the config file.
+#
+#     :return:
+#             Nothing
+#     """
+#
+#     help_str = localization_obj.get_msg("quickstore_asset_name_helpstr")
+#     sub_parser.add_argument("-n",
+#                             "--name",
+#                             type=str,
+#                             required=False,
+#                             default=None,
+#                             help=help_str)
+#
+#     help_str = localization_obj.get_msg("store_optional_merge_helpstr")
+#     sub_parser.add_argument("-m",
+#                             "--do-not-merge",
+#                             action="store_true",
+#                             help=help_str)
+#
+#     help_str = localization_obj.get_msg("optional_ignore_file_count_limit_helpstr")
+#     help_str = help_str.format(limit=config_obj.get_item("preferences", "file_count_warning"))
+#     sub_parser.add_argument("-I",
+#                             "--ignore-file-count-limit",
+#                             action="store_true",
+#                             help=help_str)
+#
+#     help_str = localization_obj.get_msg("store_optional_verify_copy_helpstr")
+#     sub_parser.add_argument("-v",
+#                             "--verify-copy",
+#                             action="store_true",
+#                             help=help_str)
+#
+#     help_str = localization_obj.get_msg("store_optional_verbose_helpstr")
+#     sub_parser.add_argument("-V",
+#                             "--verbose",
+#                             action="store_true",
+#                             help=help_str)
+#
+#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+#                                     localization_obj=localization_obj)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def setup_append_log_parser(sub_parser,
+#                             localization_obj,
+#                             name_required=True,
+#                             asset_parent_path_required=True):
+#     """
+#     Sets up the append log arguments sub-parser.
+#
+#     :param sub_parser:
+#             The sub-parser object to which we will add options.
+#     :param localization_obj:
+#             The localization object that contains all of the help strings in the appropriate language
+#     :param name_required:
+#             If True, then the asset name is a required argument.
+#     :param asset_parent_path_required:
+#             If True, then the asset parent path is a required argument.
+#
+#     :return:
+#             Nothing
+#     """
+#
+#     setup_shared_sub_parser_prefix(sub_parser=sub_parser,
+#                                    localization_obj=localization_obj,
+#                                    name_required=name_required,
+#                                    asset_parent_path_required=asset_parent_path_required)
+#
+#     help_str = localization_obj.get_msg("append_log_required_text_helpstr")
+#     sub_parser.add_argument("-t",
+#                             "--text",
+#                             nargs="+",
+#                             type=str,
+#                             required=True,
+#                             help=help_str)
+#
+#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+#                                     localization_obj=localization_obj)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def setup_display_log_parser(sub_parser,
+#                              localization_obj,
+#                              name_required=True,
+#                              asset_parent_path_required=True):
+#     """
+#     Sets up the display notes arguments sub-parser.
+#
+#     :param sub_parser:
+#             The sub-parser object to which we will add options.
+#     :param localization_obj:
+#             The localization object that contains all of the help strings in the appropriate language
+#     :param name_required:
+#             If True, then the asset name is a required argument.
+#     :param asset_parent_path_required:
+#             If True, then the asset parent path is a required argument.
+#
+#     :return:
+#             Nothing
+#     """
+#
+#     setup_shared_sub_parser_prefix(sub_parser=sub_parser,
+#                                    localization_obj=localization_obj,
+#                                    name_required=name_required,
+#                                    asset_parent_path_required=asset_parent_path_required)
+#
+#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+#                                     localization_obj=localization_obj)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def setup_delete_version_parser(sub_parser,
+#                                 localization_obj,
+#                                 name_required=True,
+#                                 asset_parent_path_required=True):
+#     """
+#     Sets up the delete version arguments sub-parser.
+#
+#     :param sub_parser:
+#             The sub-parser object to which we will add options.
+#     :param localization_obj:
+#             The localization object that contains all of the help strings in the appropriate language
+#     :param name_required:
+#             If True, then the asset name is a required argument.
+#     :param asset_parent_path_required:
+#             If True, then the asset parent path is a required argument.
+#
+#     :return:
+#             Nothing
+#     """
+#
+#     setup_shared_sub_parser_prefix(sub_parser=sub_parser,
+#                                    localization_obj=localization_obj,
+#                                    name_required=name_required,
+#                                    asset_parent_path_required=asset_parent_path_required)
+#
+#     help_str = localization_obj.get_msg("delete_version_version_helpstr")
+#     sub_parser.add_argument("-v",
+#                             "--versions",
+#                             type=str,
+#                             nargs="+",
+#                             required=True,
+#                             help=help_str)
+#
+#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+#                                     localization_obj=localization_obj)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def setup_collapse_asset_parser(sub_parser,
+#                                 localization_obj,
+#                                 name_required=True,
+#                                 asset_parent_path_required=True):
+#     """
+#     Sets up the delete version arguments sub-parser.
+#
+#     :param sub_parser:
+#             The sub-parser object to which we will add options.
+#     :param localization_obj:
+#             The localization object that contains all of the help strings in the appropriate language
+#     :param name_required:
+#             If True, then the asset name is a required argument.
+#     :param asset_parent_path_required:
+#             If True, then the asset parent path is a required argument.
+#
+#     :return:
+#             Nothing
+#     """
+#
+#     setup_shared_sub_parser_prefix(sub_parser=sub_parser,
+#                                    localization_obj=localization_obj,
+#                                    name_required=name_required,
+#                                    asset_parent_path_required=asset_parent_path_required)
+#
+#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+#                                     localization_obj=localization_obj)
+
+
+# --------------------------------------------------------------------------------------------------------------------
+def make_repo_manager(repo_list_p,
+                      config_p,
+                      language):
+    """
+    Creates and returns a repo manager object.
+
+    :param repo_list_p:
+            The path to the repo list file if one is given.
+    :param config_p:
+            The path to the config file.
+    :param language:
+            The language to use.
+
+    :return:
+            A repo manager object.
+    """
+
+    try:
+        repo_manager_obj = RepoManager(repo_list_p=repo_list_p,
+                                       config_p=config_p,
+                                       language=language)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    return repo_manager_obj
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def uri_from_name_and_path(repo_n,
+                           uri_path):
+    """
+    Given a repo name and a uri_path, return a properly formatted uri. (repo://uri_path)
+
+    :param repo_n:
+            The name of the repo
+    :param uri_path:
+            The uri path of the asset
+
+    :return:
+            A string in the format: repo://uri_path
+    """
+
+    return f"{repo_n}://{uri_path}".format(repo_n=repo_n, uri_path=uri_path)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def uri_list_from_name_and_paths(repo_n,
+                                 uri_paths):
+    """
+    Given a repo name and a LIST of uri_paths, return a list of properly formatted uri's. (repo://uri_path)
+
+    :param repo_n:
+            The name of the repo
+    :param uri_paths:
+            A list of uri_paths
+
+    :return:
+            A list of strings in the format: repo://uri_path
+    """
+
+    output = list()
+
+    for uri_path in uri_paths:
+        output.append(uri_from_name_and_path(repo_n=repo_n, uri_path=uri_path))
+
+    return output
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_make_repo(args,
+                      repo_manager_obj):
+    """
+    Create a new repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        repo_manager_obj.make_repo(args.directory)
+        repo_manager_obj.save_repo_list_file()
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_add_repo(args,
+                     repo_manager_obj):
+    """
+    Add an existing repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        repo_manager_obj.add_repo(args.directory)
+        repo_manager_obj.save_repo_list_file()
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_remove_repo(args,
+                        repo_manager_obj):
+    """
+    Remove an existing repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        repo_manager_obj.unload_repo(args.repo_name)
+        repo_manager_obj.save_repo_list_file()
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_rebuild_repo(args,
+                         repo_manager_obj):
+    """
+    Re-blesses an existing repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        repo_manager_obj.bless_repo(args.repo_name)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_repos(args,
+                       repo_manager_obj):
+    """
+    lists the existing repos.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        repo_objs = repo_manager_obj.list_repos()
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    for repo_obj in repo_objs:
+        if args.include_paths:
+            print(repo_obj.asset_n, "->", repo_obj.repo_root_d)
+        else:
+            print(repo_obj.asset_n)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_missing_repos(args,
+                               repo_manager_obj):
+    """
+    lists the missing repos (repos in the repo list file that do not exist on disk).
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        broken_repos = repo_manager_obj.list_broken_repos()
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    for key, value in broken_repos.items():
+        if args.include_paths:
+            print(key, "->", value)
+        else:
+            print(key)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_remove_missing_repos(repo_manager_obj):
+    """
+    Removes missing repos (repos that exist in the repo list file but do not exist on disk).
+
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        repo_manager_obj.save_repo_list_file()
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_default_repo(args,
+                              repo_manager_obj,
+                              localization_obj):
+    """
+    lists the default repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+
+    :return:
+            Nothing.
+    """
+
+    if repo_manager_obj.default_repo is not None:
+        if args.include_path:
+            print(repo_manager_obj.default_repo.asset_n, "->", repo_manager_obj.default_repo.repo_root_d)
+        else:
+            print(repo_manager_obj.default_repo.asset_n)
+    else:
+        msg = localization_obj.get_msg("list_default_repo_no_default_repo")
         print(msg)
-        for sub_command in sub_commands:
-            print("    ", sub_command)
-        sys.exit(0)
 
-    if opts.command not in sub_commands:
-        err = resc.error(100)
-        err.msg = err.msg.format(command=opts.command)
-        print(err.msg)
-        sys.exit(100)
 
-    cmd = os.path.join(module_d, "squirrel-" + opts.command)
-    cmd += " " + " ".join(sub_command_args)
-    os.system(cmd)
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_set_default_repo(args,
+                             repo_manager_obj,
+                             localization_obj):
+    """
+    Sets the default repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        repo_manager_obj.set_default_repo(args.repo)
+        repo_manager_obj.save_repo_list_file()
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    success_str = localization_obj.get_msg("success_set_default_repo").format(repo_name=args.repo)
+    print(success_str)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_update_repo_caches(args,
+                               repo_manager_obj,
+                               localization_obj):
+    """
+    Updates the repo cache.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=False)
+
+        cache_p = repo_manager_obj.cache_p
+        repo_n = uri.split(":/")[0]
+        notification_str = localization_obj.get_msg("begin_update_repo_caches").format(repo_name=repo_n,
+                                                                                       cache_path=cache_p)
+        print(notification_str)
+        repo_manager_obj.build_cache_for_repo(uri=uri)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    success_str = localization_obj.get_msg("success_update_repo_caches").format(repo_name=repo_n)
+    print(success_str)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def print_heading(char,
+                  max_lengths):
+    """
+
+    """
+
+    headings = dict()
+    headings["n"] = "NAME"
+    headings["p"] = "PATH"
+    headings["u"] = "URI"
+    headings["U"] = "URI PATH"
+    headings["k"] = "KEYWORDS"
+    headings["m"] = "METADATA"
+    headings["v"] = "VERSIONS"
+    headings["V"] = "LATEST VER"
+    headings["P"] = "PINS"
+
+    print("  | ", end="")
+    print(headings[char].ljust(max_lengths[char], " "), end="")
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def print_underlines(char,
+                     max_lengths):
+    """
+
+    """
+
+    print("==|=", end="")
+    print("=" * max_lengths[char], end="")
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def print_asset_data(asset_obj,
+                     repo_manager_obj,
+                     char,
+                     max_lengths):
+    """
+
+    """
+
+    if char == "n":
+        print("  | ", end="")
+        print(asset_obj.asset_n.ljust(max_lengths[char], " "), end="")
+
+    if char == "p":
+        print("  | ", end="")
+        print(asset_obj.asset_d.ljust(max_lengths[char], " "), end="")
+
+    if char == "u":
+        uri = repo_manager_obj.uri_from_asset_path(asset_obj.asset_d)
+        print("  | ", end="")
+        print(uri.ljust(max_lengths[char], " "), end="")
+
+    if char == "U":
+        uri_path = repo_manager_obj.uri_path_from_asset_path(asset_obj.asset_d)
+        print("  | ", end="")
+        print(uri_path.ljust(max_lengths[char], " "), end="")
+
+    if char == "k":
+        keywords = asset_obj.list_keywords()
+        keywords.sort()
+        print("  | ", end="")
+        print(" ".join(keywords).ljust(max_lengths[char], " "), end="")
+
+    if char == "m":
+        metadata = asset_obj.list_key_value_pairs()
+        print("  | ", end="")
+        output = list()
+        for key, value in metadata.items():
+            output.append(f"{key}={value}")
+        print(" ".join(output).ljust(max_lengths[char], " "), end="")
+
+    if char == "v":
+        versions = asset_obj.list_versions()
+        versions.sort()
+        print("  | ", end="")
+        print(" ".join(versions).ljust(max_lengths[char], " "), end="")
+
+    if char == "V":
+        print("  | ", end="")
+        print(asset_obj._create_version_obj(None).version_str.ljust(max_lengths[char]), end="")
+
+    if char == "P":
+        print("  | ", end="")
+        print(" ".join(asset_obj.list_pins()).ljust(max_lengths[char]), end="")
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_assets(args,
+                        repo_manager_obj,
+                        localization_obj):
+    """
+    lists the assets in a repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+
+    :return:
+            Nothing.
+    """
+
+    config_obj = setupconfig.create_config_object(validation_dict=constants.COMMAND_LINE_CONFIG_SECTIONS,
+                                                  localized_resource_obj=localization_obj,
+                                                  config_p=args.config_path)
+
+    fields_format = config_obj.get_string("command_line_settings", "default_fields")
+    for char in fields_format:
+        if char not in "npuUkmNtvVP":
+            err_msg = localization_obj.get_error_msg(2)
+            err_msg = err_msg.format(char=char)
+            print(err_msg)
+            return
+
+    if not args.format:
+        args.format = fields_format
+
+    for char in args.format:
+        if char not in "npuUkmNtvVP":
+            err_msg = localization_obj.get_error_msg(1)
+            err_msg = err_msg.format(char=char)
+            print(err_msg)
+            return
+
+    if args.metadata_keys_and_values is not None:
+        metadata_keys_and_values = list()
+        for item in args.metadata_keys_and_values:
+
+            if "!=" in item:
+                comparison_type = "!="
+            elif ">=" in item:
+                comparison_type = ">="
+            elif "<=" in item:
+                comparison_type = "<="
+            elif "=>" in item:
+                comparison_type = ">="
+            elif "=<" in item:
+                comparison_type = "<="
+            elif "=" in item:
+                comparison_type = "="
+            elif ">" in item:
+                comparison_type = ">"
+            elif "<" in item:
+                comparison_type = "<"
+            else:
+                comparison_type = None
+
+            if comparison_type is not None:
+                key, value = item.split(comparison_type)
+                metadata_keys_and_values.append((key, comparison_type, value))
+            else:
+                metadata_keys_and_values.append((item, "", ""))
+
+    else:
+        metadata_keys_and_values = None
+
+    print("Retrieving data...")
+    asset_objs = list()
+    try:
+        if args.uri is None:
+            args.uri = [None]
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=False)
+
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            asset_objs.extend(repo_obj.list_asset_objs(uri=uri,
+                                                       keywords=args.keywords,
+                                                       metadata_keys=args.metadata_keys,
+                                                       metadata_key_and_values=metadata_keys_and_values,
+                                                       kw_match_use_and=args.keywords_and,
+                                                       meta_match_use_and=args.metadata_and))
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    print("Formatting data:")
+    max_lengths = dict()
+    max_lengths["n"] = 10
+    max_lengths["p"] = 4
+    max_lengths["u"] = 3
+    max_lengths["U"] = 8
+    max_lengths["k"] = 8
+    max_lengths["m"] = 8
+    max_lengths["v"] = 8
+    max_lengths["V"] = 10
+    max_lengths["P"] = 4
+
+    asset_count = len(asset_objs)
+    curr_asset = 1
+    for asset_obj in asset_objs:
+
+        print(f"{str(curr_asset)} of {str(asset_count)}", end="\r")
+        curr_asset += 1
+        sys.stdout.flush()
+        max_lengths["n"] = max(max_lengths["n"], len(asset_obj.asset_n))
+        max_lengths["p"] = max(max_lengths["p"], len(asset_obj.asset_d))
+        max_lengths["u"] = max(max_lengths["u"], len(repo_manager_obj.uri_from_asset_path(asset_obj.asset_d)))
+        max_lengths["U"] = max(max_lengths["U"], len(repo_manager_obj.uri_path_from_asset_path(asset_obj.asset_d)))
+        max_lengths["k"] = max(max_lengths["k"], len(" ".join(asset_obj.list_keywords())))
+        metadata = [f"{k}={v}" for k, v in asset_obj.list_key_value_pairs().items()]
+        max_lengths["m"] = max(max_lengths["m"], len(" ".join(metadata)))
+        max_lengths["v"] = max(max_lengths["v"], len(" ".join(asset_obj.list_versions())))
+        max_lengths["V"] = max(max_lengths["V"], len(" ".join(asset_obj._create_version_obj(None).version_str)))
+        max_lengths["P"] = max(max_lengths["P"], len(" ".join(asset_obj.list_pins())))
+    print("\n\n")
+
+    for char in args.format:
+        print_heading(char, max_lengths)
+    print()
+
+    for char in args.format:
+        print_underlines(char, max_lengths)
+    print()
+
+    for asset_obj in asset_objs:
+        for char in args.format:
+            print_asset_data(asset_obj=asset_obj,
+                             repo_manager_obj=repo_manager_obj,
+                             char=char,
+                             max_lengths=max_lengths)
+        print()
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_keywords(args,
+                          repo_manager_obj):
+    """
+    lists the keywords used anywhere in a repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    keywords = list()
+
+    try:
+        if args.uri is None:
+            args.uri = [None]
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=False)
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            keywords.extend(repo_obj.list_keywords(uri=uri))
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    keywords = list(set(keywords))
+    keywords.sort()
+    print("\n".join(keywords))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_add_keywords(args,
+                         repo_manager_obj,
+                         localization_obj,
+                         log_str):
+    """
+    Adds keywords to an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=False)
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            repo_obj.add_keywords(uri=uri, keywords=args.keywords)
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_keywords(args,
+                            repo_manager_obj,
+                            localization_obj,
+                            log_str):
+    """
+    Deletes keywords from an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=True)
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            repo_obj.delete_keywords(uri=uri, keywords=args.keywords)
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_all_keywords(args,
+                                repo_manager_obj,
+                                log_str):
+    """
+    Deletes all keywords from an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param log_str:
+            A string to append to the log.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=True)
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            repo_obj.delete_all_keywords(uri=uri)
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_metadata_keys(args,
+                               repo_manager_obj):
+    """
+    lists the metadata keys used anywhere in a repo.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    metadata_keys = list()
+
+    try:
+        if args.uri is None:
+            args.uri = [None]
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=False)
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            metadata_keys.extend(repo_obj.list_metadata_keys(uri=uri))
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    metadata_keys = list(set(metadata_keys))
+    metadata_keys.sort()
+    print("\n".join(metadata_keys))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_add_metadata(args,
+                         repo_manager_obj,
+                         localization_obj,
+                         log_str):
+    """
+    Adds metadata to an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    # TODO: Change this (and add-keywords and add-notes) to accept more ambiguous uri's so that we can add to multiple
+    #  assets at the same time.
+    try:
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=True)
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            repo_obj.add_metadata(uri=uri, metadata=args.metadata)
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_metadata(args,
+                            repo_manager_obj,
+                            localization_obj,
+                            log_str):
+    """
+    deletes metadata from an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=True)
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            repo_obj.delete_metadata(uri=uri, metadata_keys=args.metadata)
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_all_metadata(args,
+                                repo_manager_obj,
+                                localization_obj,
+                                log_str):
+    """
+    deletes metadata from an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        for user_uri in args.uri:
+            uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
+                                                    repo_required=False,
+                                                    path_required=False,
+                                                    name_required=True)
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            repo_obj.delete_all_metadata(uri=uri)
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_version_notes(args,
+                               repo_manager_obj,
+                               localization_obj):
+    """
+    Lists notes from a version of an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        notes = repo_obj.list_version_notes(uri=uri, version=args.version)
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    print(notes)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_add_version_notes(args,
+                              repo_manager_obj,
+                              localization_obj,
+                              log_str):
+    """
+    Adds notes to a version of an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    args.notes = " ".join(args.notes)
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.add_version_notes(notes=args.notes,
+                                   uri=uri,
+                                   version=args.version,
+                                   overwrite=args.overwrite,
+                                   log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_version_notes(args,
+                                 repo_manager_obj,
+                                 localization_obj,
+                                 log_str):
+    """
+    Deletes notes from a version of an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.delete_version_notes(uri=uri,
+                                      version=args.version,
+                                      log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_asset_notes(args,
+                             repo_manager_obj,
+                             localization_obj):
+    """
+    Lists notes from an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        notes = repo_obj.list_asset_notes(uri=uri)
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    print(notes)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_add_asset_notes(args,
+                            repo_manager_obj,
+                            localization_obj,
+                            log_str):
+    """
+    Adds notes to an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    args.notes = " ".join(args.notes)
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.add_asset_notes(notes=args.notes,
+                                 uri=uri,
+                                 overwrite=args.overwrite,
+                                 log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_asset_notes(args,
+                               repo_manager_obj,
+                               localization_obj,
+                               log_str):
+    """
+    Deletes notes from an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.delete_asset_notes(uri=uri,
+                                    log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_add_thumbnails(args,
+                           repo_manager_obj,
+                           localization_obj,
+                           log_str):
+    """
+    Adds thumbnails to an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    if args.poster_frame_num is None:
+        args.poster_frame_num = "0"
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.add_thumbnails(uri=uri,
+                                thumbnails_p=args.thumbnails_p,
+                                poster_p=args.thumbnails_p[int(args.poster_frame_num)],
+                                version=args.version,
+                                log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_set_pin(args,
+                    repo_manager_obj,
+                    localization_obj,
+                    log_str):
+    """
+    Sets a pin.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.set_pin(uri=uri,
+                         pin_n=args.pin,
+                         version_str=args.version,
+                         log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_pin(args,
+                       repo_manager_obj,
+                       localization_obj,
+                       log_str):
+    """
+    Sets a pin.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.delete_pin(uri=uri,
+                            pin_n=args.pin,
+                            allow_delete_locked=False,
+                            log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_quick_store(args,
+#                         localization_obj):
+#     """
+#     Store the asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#     :param localization_obj:
+#             The localization object for error messages and the like.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset_parent_path = os.environ[DEFAULT_ASSET_PATH_ENV]
+#     except KeyError:
+#         err_msg = localization_obj.get_error_msg(120)
+#         err_msg = err_msg.format(env=DEFAULT_ASSET_PATH_ENV)
+#         print(err_msg)
+#         sys.exit(120)
+#
+#     if not os.path.exists(asset_parent_path):
+#         err_msg = localization_obj.get_error_msg(121)
+#         err_msg = err_msg.format(env=DEFAULT_ASSET_PATH_ENV, path=asset_parent_path)
+#         print(err_msg)
+#         sys.exit(121)
+#
+#     if not os.path.isdir(asset_parent_path):
+#         err_msg = localization_obj.get_error_msg(122)
+#         err_msg = err_msg.format(env=DEFAULT_ASSET_PATH_ENV, path=asset_parent_path)
+#         print(err_msg)
+#         sys.exit(122)
+#
+#     if args.name is None:
+#         args.name = os.path.split(os.getcwd())[1]
+#
+#     args.skip_symlinks = False
+#     args.follow_external_symlinks = False
+#
+#     src_p = os.getcwd()
+#
+#     subtask_store(args, localization_obj, asset_parent_path, src_p)
+
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_list_pins(args):
+#     """
+#     Lists all of the pins in an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     pins = asset.list_pins()
+#     if pins:
+#         max_len = 0
+#         for pin in pins.keys():
+#             max_len = max(max_len, len(pin))
+#         for pin in pins.keys():
+#             print(pin.rjust(max_len, " "), "->", pins[pin])
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_delete_pin(args):
+#     """
+#     Lists all of the pins in an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.delete_pin(args.pin, allow_delete_default=False)
+#     except AssetError as e:
+#         if e.code == 116:
+#             print(f"({e.code}) {e.message}")
+#             sys.exit(e.code)
+#         raise
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_add_keywords(args):
+#     """
+#     Add keywords to an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.add_keywords(args.keywords)
+#     except AssetError as e:
+#         if e.code == 118:
+#             print(f"({e.code}) {e.message}")
+#             sys.exit(e.code)
+#         raise
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_delete_keywords(args):
+#     """
+#     Delete keywords from an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.delete_keywords(args.keywords)
+#     except AssetError as e:
+#         if e.code == 118:
+#             print(f"({e.code}) {e.message}")
+#             sys.exit(e.code)
+#         raise
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_list_keywords(args):
+#     """
+#     Lists the keywords assigned to an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         print("\n".join(asset.list_keywords()))
+#     except AssetError as e:
+#         if e.code == 118:
+#             print(f"({e.code}) {e.message}")
+#             sys.exit(e.code)
+#         raise
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_add_metadata(args):
+#     """
+#     Add metadata (key/value pairs) to an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     # Reprocess the args because they need to be separated on commas, not spaces.
+#     args_str = " ".join(args.metadata)
+#     args_str = args_str.replace(r"\,", "BVZCOMMABVZ")
+#     args_list = args_str.split(",")
+#     args_dict = dict()
+#
+#     for arg in args_list:
+#         key, value = arg.split("=", 1)
+#         key = key.strip()
+#         value = value.strip().replace("BVZCOMMABVZ", ",")
+#         args_dict[key] = value
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.add_key_value_pairs(args_dict)
+#     except AssetError as e:
+#         if e.code == 118:
+#             print(f"({e.code}) {e.message}")
+#             sys.exit(e.code)
+#         raise
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_delete_metadata(args):
+#     """
+#     Delete metadata (key/value pairs) from an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.delete_key_value_pairs(args.metadata_keys)
+#     except AssetError as e:
+#         if e.code == 119:
+#             print(f"({e.code}) {e.message}")
+#             sys.exit(e.code)
+#         raise
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_list_metadata(args):
+#     """
+#     Lists the metadata (key/value pairs) assigned to an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         metadata = asset.list_key_value_pairs()
+#     except AssetError as e:
+#         if e.code == 119:
+#             print(f"({e.code}) {e.message}")
+#             sys.exit(e.code)
+#         raise
+#
+#     for key, value in metadata.items():
+#         print(key, "=", value)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_add_notes(args,
+#                       config_obj):
+#     """
+#     Adds notes to a specific version of an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#     :param config_obj:
+#             The config object responsible for reading the config file.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     if args.version is None:
+#         args.version = config_obj.get_item("preferences", "default_pin_name")
+#
+#     notes = " ".join(args.notes)
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.add_notes(version=args.version,
+#                         notes=notes,
+#                         overwrite=args.overwrite)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_display_notes(args,
+#                           config_obj):
+#     """
+#     Lists notes from a specific version of an asset.
+#
+#     :param args:
+#             The parsed arguments object.
+#     :param config_obj:
+#             The config object responsible for reading the config file.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     if args.version is None:
+#         args.version = config_obj.get_item("preferences", "default_pin_name")
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         notes = asset.display_notes(version=args.version)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     print(notes)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_append_log(args):
+#     """
+#     Appends text to the log.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     text = " ".join(args.text)
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.append_to_log(text=text)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_display_log(args):
+#     """
+#     Displays the log.
+#
+#     :param args:
+#             The parsed arguments object.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         text = asset.display_log()
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     print(text)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_delete_version(args,
+#                            config_obj):
+#     """
+#     Deletes a version from the asset..
+#
+#     :param args:
+#             The parsed arguments object.
+#     :param config_obj:
+#             The config object responsible for reading the config file.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     if args.versions is None:
+#         args.versions = config_obj.get_item("preferences", "default_pin_name")
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.delete_versions(delete_versions=args.versions)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#
+# # ----------------------------------------------------------------------------------------------------------------------
+# def subtask_collapse_asset(args,
+#                            localization_obj):
+#     """
+#     Deletes all but the latest version from the asset..
+#
+#     :param args:
+#             The parsed arguments object.
+#     :param localization_obj:
+#             The localization object that contains all of the help strings in the appropriate language.
+#
+#     :return:
+#             Nothing.
+#     """
+#
+#     accept_list = ["YES"]
+#     quit_list = ["NO", "N", "QUIT", "Q"]
+#
+#     warn_msg = localization_obj.get_msg("warn_collapse")
+#     warn_msg = warn_msg.format(asset_name=args.name,
+#                                dir=args.directory)
+#
+#     result = ""
+#     print(warn_msg)
+#     while result.upper() not in accept_list and result.upper() not in quit_list:
+#         try:
+#             result = input("> ")
+#         except KeyboardInterrupt:
+#             print()
+#             return
+#         if result.upper() not in accept_list and result.upper() not in quit_list:
+#             please_yes_no_msg = localization_obj.get_msg("please_yes_no")
+#             print(please_yes_no_msg)
+#
+#     if result.upper() in quit_list:
+#         return
+#
+#     try:
+#         asset = Asset(asset_parent_d=args.directory,
+#                       name=args.name,
+#                       config_p=args.config_path)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+#
+#     try:
+#         asset.collapse(del_orphaned_pins=True)
+#     except AssetError as e:
+#         print(f"({e.code}) {e.message}")
+#         sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def validate_args(args,
+                  localization_obj):
+    """
+    Perform some basic validation on the args passed by the user.
+
+    :param args:
+            The args passed by the user.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language.
+
+    :return:
+            True if the validations pan out. False otherwise.
+    """
+
+    if args.config_path is not None:
+        if not os.path.exists(args.config_path):
+            err_msg = localization_obj.get_error_msg(503)
+            err_msg = err_msg.format(config=args.config_path)
+            print(err_msg)
+            sys.exit(503)
+
+    try:
+        if args.directory is None:
+            args.directory = os.path.split(os.getcwd())[0]
+            args.repo_name = os.path.split(os.getcwd())[1]
+    except AttributeError:  # Some of the sub-tasks do not have the args.directory option
+        pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def run_sub_task(args,
+                 localization_obj,
+                 repo_manager_obj):
+    """
+    Runs the appropriate sub-task depending on the user's choice.
+
+    :param args:
+            The parsed arguments from the user.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language.
+    :param repo_manager_obj:
+            The repo manager object.
+
+    :return:
+    """
+
+    validate_args(args, localization_obj)
+
+    log_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    log_str += " " + getpass.getuser() + ": "
+
+    try:
+
+        if args.sub_task.upper() in ["MAKE-REPO", "MR"]:
+            subtask_make_repo(args, repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["ADD-REPO", "AR"]:
+            subtask_add_repo(args, repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["REMOVE-REPO", "REMR"]:
+            subtask_remove_repo(args, repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["REBUILD-REPO", "RR"]:
+            subtask_rebuild_repo(args, repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["LIST-REPOS", "LR"]:
+            subtask_list_repos(args, repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["LIST-MISSING-REPOS", "LMR"]:
+            subtask_list_missing_repos(args, repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["REMOVE-MISSING-REPOS", "RMR"]:
+            subtask_remove_missing_repos(args)
+            return
+
+        if args.sub_task.upper() in ["LIST-DEFAULT-REPO", "LDR"]:
+            subtask_list_default_repo(args, repo_manager_obj, localization_obj)
+            return
+
+        if args.sub_task.upper() in ["SET-DEFAULT-REPO", "SDR"]:
+            subtask_set_default_repo(args, repo_manager_obj, localization_obj)
+            return
+
+        if args.sub_task.upper() in ["UPDATE-REPO-CACHES", "URC"]:
+            subtask_update_repo_caches(args, repo_manager_obj, localization_obj)
+            return
+
+        if args.sub_task.upper() in ["LIST-ASSETS", "LA"]:
+            subtask_list_assets(args, repo_manager_obj, localization_obj)
+            return
+
+        if args.sub_task.upper() in ["ADD-KEYWORDS", "AK"]:
+            subtask_add_keywords(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["DELETE-KEYWORDS", "DK"]:
+            subtask_delete_keywords(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["DELETE-ALL-KEYWORDS", "DAK"]:
+            subtask_delete_all_keywords(args, repo_manager_obj, localization_obj)
+            return
+
+        if args.sub_task.upper() in ["LIST-KEYWORDS", "LK"]:
+            subtask_list_keywords(args, repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["LIST-METADATA", "LM"]:
+            subtask_list_metadata_keys(args, repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["ADD-METADATA", "AM"]:
+            subtask_add_metadata(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["DELETE-METADATA", "DM"]:
+            subtask_delete_metadata(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["DELETE-ALL-METADATA", "DAM"]:
+            subtask_delete_all_metadata(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["ADD-VERSION-NOTES", "AVN"]:
+            subtask_add_version_notes(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["DELETE-VERSION-NOTES", "DVN"]:
+            subtask_delete_version_notes(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["LIST-VERSION-NOTES", "LVN"]:
+            subtask_list_version_notes(args, repo_manager_obj, localization_obj)
+            return
+
+        if args.sub_task.upper() in ["ADD-ASSET-NOTES", "AAN"]:
+            subtask_add_asset_notes(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["DELETE-ASSET-NOTES", "DAN"]:
+            subtask_delete_asset_notes(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["LIST-ASSET-NOTES", "LAN"]:
+            subtask_list_asset_notes(args, repo_manager_obj, localization_obj)
+            return
+
+        if args.sub_task.upper() in ["ADD-THUMBNAILS", "AT"]:
+            subtask_add_thumbnails(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["SET-PIN", "SP"]:
+            subtask_set_pin(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["DELETE-PIN", "DP"]:
+            subtask_delete_pin(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+    except LocalizationError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+#
+    # if args.sub_task.upper() in ["QUICK-STORE", "QS"]:
+    #     subtask_quick_store(args, localization_obj)
+    #     return
+    #
+    # if args.sub_task.upper() in ["SET-PIN", "SP"]:
+    #     subtask_set_pin(args, localization_obj)
+    #     return
+    #
+    # if args.sub_task.upper() in ["LIST-PINS", "LP"]:
+    #     subtask_list_pins(args)
+    #     return
+    #
+    # if args.sub_task.upper() in ["DELETE-PIN", "DP"]:
+    #     subtask_delete_pin(args)
+    #     return
+    #
+    # if args.sub_task.upper() in ["DELETE_KEYWORDS", "DK"]:
+    #     subtask_delete_keywords(args)
+    #     return
+    #
+    # if args.sub_task.upper() in ["LIST_KEYWORDS", "LK"]:
+    #     subtask_list_keywords(args)
+    #     return
+    #
+    # if args.sub_task.upper() in ["DELETE_METADATA", "DM"]:
+    #     subtask_delete_metadata(args)
+    #     return
+    #
+    # if args.sub_task.upper() in ["LIST_METADATA", "LM"]:
+    #     subtask_list_metadata(args)
+    #     return
+    #
+    # if args.sub_task.upper() in ["ADD_NOTES", "AN"]:
+    #     subtask_add_notes(args, config_obj)
+    #     return
+    #
+    # if args.sub_task.upper() in ["DISPLAY_NOTES", "DN"]:
+    #     subtask_display_notes(args, config_obj)
+    #     return
+    #
+    # if args.sub_task.upper() in ["APPEND_LOG", "AL"]:
+    #     subtask_append_log(args)
+    #     return
+    #
+    # if args.sub_task.upper() in ["DISPLAY_LOG", "DL"]:
+    #     subtask_display_log(args)
+    #     return
+    #
+    # if args.sub_task.upper() in ["DELETE_VERSION", "DV"]:
+    #     subtask_delete_version(args, config_obj)
+    #     return
+    #
+    # if args.sub_task.upper() in ["COLLAPSE_ASSET", "CA"]:
+    #     subtask_collapse_asset(args, localization_obj)
+    #     return
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def main():
+
+    language = get_language()
+    localization_obj = create_localization_object(language)
+
+    args = initial_parser_setup(localization_obj)
+
+    repo_manager_obj = make_repo_manager(repo_list_p=args.repo_list_path,
+                                         config_p=args.config_path,
+                                         language=language)
+
+    run_sub_task(args=args,
+                 localization_obj=localization_obj,
+                 repo_manager_obj=repo_manager_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def test():
+
+    import glob
+
+    language = get_language()
+    localization_obj = create_localization_object(language)
+
+    args = initial_parser_setup(localization_obj)
+
+    print(args)
+    # repo_manager_obj = make_repo_manager(repo_list_p=None,
+    #                                      config_p=None,
+    #                                      language=language)
+    #
+    # test_cases = ["repo://asset/veh/land/commercial/asset_veh_land_commercial_cargo_truck_A",
+    #               "repo://asset/veh/land/commercial/",
+    #               "repo://asset/veh/",
+    #               "repo://asset/veh/land/commercial",
+    #               "repo://asset/veh",
+    #               "repo:/asset_veh_land_commercial_cargo_truck_A",
+    #               "/asset/veh/land/commercial/asset_veh_land_commercial_cargo_truck_A",
+    #               "/asset/veh/land/commercial",
+    #               "/asset/veh",
+    #               "repo:/"]
+    #
+    # for test_case in test_cases:
+    #     print("\n\n" + test_case)
+    #     print(repo_manager_obj.disambiguate_uri(test_case))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+if __name__ == "__main__":
+
+    main()
+    # test()

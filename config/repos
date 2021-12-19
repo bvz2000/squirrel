@@ -1,0 +1,7 @@
+[repos]
+test_repo = /home/bvz/Desktop/test_repo/
+local_repo = /home/bvz/Documents/local_repo/
+
+[defaults]
+default_repo = local_repo
+
