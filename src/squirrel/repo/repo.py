@@ -5,7 +5,7 @@ import pathlib
 from squirrel.asset.asset import Asset
 from squirrel.shared import urilib
 from squirrel.shared.squirrelerror import SquirrelError
-from framespec import Framespec
+from bvzframespec import Framespec
 
 # TODO: There are a bunch of doubled up verification steps (validating the uri in each function for example, or doubled
 #  up assertions). Reduce those.
