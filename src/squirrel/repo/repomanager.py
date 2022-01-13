@@ -148,6 +148,10 @@ class RepoManager(object):
                 err_msg = err_msg.format(required=required_str)
                 raise SquirrelError(err_msg, 901)
 
+            if self.default_repo is None:
+                err_msg = self.localized_resource_obj.get_error_msg(203)
+                raise SquirrelError(err_msg, 203)
+
             repo_n = self.default_repo.repo_n
 
             if repo_n not in self.repos.keys():
@@ -592,6 +596,7 @@ class RepoManager(object):
                 raise
 
     # ------------------------------------------------------------------------------------------------------------------
+    # TODO: Also remove repo data from cache
     def unload_repo(self,
                     repo_n):
         """
@@ -656,7 +661,7 @@ class RepoManager(object):
         else:
             self.repo_list_obj.merge_section("repos", repos)
 
-        self.repo_list_obj.replace_section("defaults", {"default_repo": self.default_repo})
+        self.repo_list_obj.replace_section("defaults", {"default_repo": self.default_repo.repo_n})
 
     # ------------------------------------------------------------------------------------------------------------------
     def save_repo_list_file(self):
@@ -736,6 +741,7 @@ class RepoManager(object):
         self.bless_repo(repo_obj.repo_n)
 
     # ------------------------------------------------------------------------------------------------------------------
+    # TODO: Also cache this repo
     def add_repo(self,
                  repo_d):
         """
