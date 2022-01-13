@@ -21,11 +21,11 @@ def validate_config(config_obj,
     :param validation_dict:
             A dictionary where the key is the section that must exist. The value may be None which indicates that there
             is no defined set of options in the section (in other words, the section must exist, but it can have any
-            content (or even no content).
+            content - or even no content).
 
             If there are defined items that must exist in the section then the value must be in the form of:
 
-            [(option name1, data type), (option name2, data type)]
+            [(option name1, data type), (option name2, data type), etc.]
 
             For example:
 
@@ -72,7 +72,7 @@ def create_config_object(validation_dict,
     :param validation_dict:
             A dictionary where the key is the section that must exist. The value may be None which indicates that there
             is no defined set of options in the section (in other words, the section must exist, but it can have any
-            content (or even no content).
+            content - or even no content).
 
             If there are defined items that must exist in the section then the value must be in the form of:
 
