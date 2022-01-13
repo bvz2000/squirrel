@@ -33,12 +33,11 @@ class RepoManager(object):
         repos are managed by the repo class.
 
         :param config_p:
-                An optional path to a config file. If omitted, defaults to None which means use either the path given by
-                an env var OR the standard location for the config file.
+                An optional path to a config file. If omitted or None, use either the path given by an env var OR the
+                standard location for the config file.
         :param repo_list_p:
-                An optional path to a repo list file that identifies which repos are active in the system. If omitted,
-                defaults to None which means use either the path given by an env var OR the standard location for the
-                repo list file.
+                An optional path to a repo list file that identifies which repos are active in the system. If omitted or
+                None, use either the path given by an env var OR the standard location for the repo list file.
         :param language:
                 The language used for communication with the end user. Defaults to "english".
         """
@@ -673,23 +672,32 @@ class RepoManager(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def bless_repo(self,
-                   repo_n):
+                   repo_p):
         """
-        Given a name of a repo, blesses all of the directories within the root path.
+        Given a path to a repo, blesses all of the directories within the root path.
 
-        :param repo_n:
-                The name of the repo.
+        :param repo_p:
+                The repo path.
 
         :return:
                 Nothing.
         """
 
-        if repo_n not in self.repos.keys():
-            err_msg = self.localized_resource_obj.get_error_msg(102)
-            err_msg = err_msg.format(repo_name=repo_n)
-            raise SquirrelError(err_msg, 102)
+        # Create a temporary repo object that points to this path.
+        if not os.path.isdir(repo_p):
+            err_msg = self.localized_resource_obj.get_error_msg(302)
+            err_msg = err_msg.format(repo_path=repo_p)
+            raise SquirrelError(err_msg, 302)
 
-        self.repos[repo_n].bless_repo()
+        repo_obj = Repo(repo_root_d=repo_p,
+                        cache_d=self.cache_d,
+                        config_obj=self.config_obj,
+                        localized_resource_obj=self.localized_resource_obj,
+                        sql_resources=self.sql_resources,
+                        connection=self.connection,
+                        cursor=self.cursor)
+
+        repo_obj.bless_repo()
 
     # ------------------------------------------------------------------------------------------------------------------
     def make_repo(self,
@@ -816,4 +824,4 @@ class RepoManager(object):
             err_msg = err_msg.format(repo_name=repo_n)
             raise SquirrelError(err_msg, 102)
 
-        self.default_repo = self.repos[repo_n].asset_n
+        self.default_repo = self.repos[repo_n].repo_n
