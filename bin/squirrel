@@ -8,7 +8,6 @@ import os.path
 import re
 import sys
 import textwrap as textwrap
-import time
 
 from squirrel.repo.repomanager import RepoManager
 from bvzlocalizationerror import LocalizationError
@@ -442,31 +441,6 @@ def initial_parser_setup(localization_obj):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def setup_shared_repo_option(sub_parser,
-                             localization_obj):
-    """
-    Adds the --repo option to the sub-parser
-
-    :param sub_parser:
-            The sub-parser object to which we will add the --repo option.
-    :param localization_obj:
-            The localization object that contains all of the help strings in the appropriate language
-
-    :return:
-            Nothing
-    """
-    # TODO: REMOVE THIS FUNCTION
-    return
-    help_str = localization_obj.get_msg("prefix_repo_name_optional_helpstr")
-    sub_parser.add_argument("-r",
-                            "--repo",
-                            type=str,
-                            required=False,
-                            default=None,
-                            help=help_str)
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 def setup_shared_asset_name_option(sub_parser,
                                    localization_obj):
     """
@@ -653,9 +627,9 @@ def setup_rebuild_repo_parser(sub_parser,
             Nothing
     """
 
-    help_str = localization_obj.get_msg("rebuild_repo_name_required_helpstr")
-    sub_parser.add_argument("-r",
-                            "--repo-name",
+    help_str = localization_obj.get_msg("rebuild_repo_path_required_helpstr")
+    sub_parser.add_argument("-p",
+                            "--repo-path",
                             type=str,
                             required=True,
                             help=help_str)
@@ -825,8 +799,6 @@ def setup_list_assets_parser(sub_parser,
     :return:
             Nothing
     """
-
-    setup_shared_repo_option(sub_parser, localization_obj)
 
     help_str = localization_obj.get_msg("list_assets_uri_path_optional_helpstr")
     sub_parser.add_argument("-u",
@@ -1013,8 +985,6 @@ def setup_list_keywords_parser(sub_parser,
             Nothing
     """
 
-    setup_shared_repo_option(sub_parser, localization_obj)
-
     help_str = localization_obj.get_msg("list_keywords_uri_paths_optional_helpstr")
     sub_parser.add_argument("-u",
                             metavar="uri",
@@ -1148,8 +1118,6 @@ def setup_list_metadata_parser(sub_parser,
     :return:
             Nothing
     """
-
-    setup_shared_repo_option(sub_parser, localization_obj)
 
     help_str = localization_obj.get_msg("list_metadata_uri_paths_optional_helpstr")
     sub_parser.add_argument("-u",
@@ -1875,7 +1843,7 @@ def subtask_rebuild_repo(args,
     """
 
     try:
-        repo_manager_obj.bless_repo(args.repo_name)
+        repo_manager_obj.bless_repo(args.repo_path)
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
@@ -1910,9 +1878,9 @@ def subtask_list_repos(args,
 
     for repo_obj in repo_objs:
         if args.include_paths:
-            print(repo_obj.asset_n, "->", repo_obj.repo_root_d)
+            print(repo_obj.repo_n, "->", repo_obj.repo_root_d)
         else:
-            print(repo_obj.asset_n)
+            print(repo_obj.repo_n)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1988,9 +1956,9 @@ def subtask_list_default_repo(args,
 
     if repo_manager_obj.default_repo is not None:
         if args.include_path:
-            print(repo_manager_obj.default_repo.asset_n, "->", repo_manager_obj.default_repo.repo_root_d)
+            print(repo_manager_obj.default_repo.repo_n, "->", repo_manager_obj.default_repo.repo_root_d)
         else:
-            print(repo_manager_obj.default_repo.asset_n)
+            print(repo_manager_obj.default_repo.repo_n)
     else:
         msg = localization_obj.get_msg("list_default_repo_no_default_repo")
         print(msg)
@@ -3528,7 +3496,7 @@ def run_sub_task(args,
             return
 
         if args.sub_task.upper() in ["REMOVE-MISSING-REPOS", "RMR"]:
-            subtask_remove_missing_repos(args)
+            subtask_remove_missing_repos(repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["LIST-DEFAULT-REPO", "LDR"]:
@@ -3700,8 +3668,6 @@ def main():
 
 # ----------------------------------------------------------------------------------------------------------------------
 def test():
-
-    import glob
 
     language = get_language()
     localization_obj = create_localization_object(language)
