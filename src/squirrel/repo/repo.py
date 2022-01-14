@@ -1557,11 +1557,15 @@ class Repo(object):
         :param uri:
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
         :param metadata:
-                A list of metadata key=value pairs to add. Metadata (both keys and values) is case insensitive.
+                A list of metadata key=value pairs to add. Metadata (both keys and values) is case-insensitive.
 
         :return:
                 Nothing.
         """
+
+        if metadata is None or not metadata:
+            err_msg = self.localized_resource_obj.get_error_msg(1000)
+            raise SquirrelError(err_msg, 1000)
 
         assert type(uri) is str
         assert type(metadata) is list
@@ -1610,6 +1614,10 @@ class Repo(object):
         :return:
                 Nothing.
         """
+
+        if metadata_keys is None or not metadata_keys:
+            err_msg = self.localized_resource_obj.get_error_msg(1001)
+            raise SquirrelError(err_msg, 1001)
 
         assert type(uri) is str
         assert type(metadata_keys) is list

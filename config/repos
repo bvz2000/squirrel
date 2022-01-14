@@ -1,6 +1,7 @@
 [repos]
 local_repo = /home/bvz/Documents/local_repo/
 test_repo = /home/bvz/Desktop/test_repo/
+repo = /zed/repo/
 
 [defaults]
 default_repo = local_repo
