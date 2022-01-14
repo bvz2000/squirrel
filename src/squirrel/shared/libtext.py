@@ -13,13 +13,12 @@ def write_to_text_file(file_p,
     :param text:
             The string to add to this file.
     :param overwrite:
-            If True, then the notes will overwrite the current set of notes. Otherwise they will be appended.
+            If True, then the notes will overwrite the current set of notes, otherwise they will be appended.
 
     :return:
             Nothing.
     """
 
-    print(os.path.split(file_p)[0])
     assert os.path.exists(os.path.split(file_p)[0])
     assert type(text) is str
     assert type(overwrite) is bool
