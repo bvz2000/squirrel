@@ -2054,6 +2054,7 @@ def print_heading(char,
     headings["v"] = "VERSIONS"
     headings["V"] = "LATEST VER"
     headings["P"] = "PINS"
+    headings["N"] = "NOTES"
 
     print("  | ", end="")
     print(headings[char].ljust(max_lengths[char], " "), end="")
@@ -2119,11 +2120,15 @@ def print_asset_data(asset_obj,
 
     if char == "V":
         print("  | ", end="")
-        print(asset_obj._create_version_obj(None).version_str.ljust(max_lengths[char]), end="")
+        print(asset_obj.create_version_obj(None).version_str.ljust(max_lengths[char]), end="")
 
     if char == "P":
         print("  | ", end="")
         print(" ".join(asset_obj.list_pins()).ljust(max_lengths[char]), end="")
+
+    if char == "N":
+        print("  | ", end="")
+        print(asset_obj.list_asset_notes().replace("\n", " - ").ljust(max_lengths[char]), end="")
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -2198,7 +2203,7 @@ def subtask_list_assets(args,
     else:
         metadata_keys_and_values = None
 
-    print("Retrieving data...")
+    print(localization_obj.get_msg("retrieving_data"))
     asset_objs = list()
     try:
         if args.uri is None:
@@ -2235,6 +2240,7 @@ def subtask_list_assets(args,
     max_lengths["v"] = 8
     max_lengths["V"] = 10
     max_lengths["P"] = 4
+    max_lengths["N"] = 5
 
     asset_count = len(asset_objs)
     curr_asset = 1
@@ -2251,8 +2257,9 @@ def subtask_list_assets(args,
         metadata = [f"{k}={v}" for k, v in asset_obj.list_key_value_pairs().items()]
         max_lengths["m"] = max(max_lengths["m"], len(" ".join(metadata)))
         max_lengths["v"] = max(max_lengths["v"], len(" ".join(asset_obj.list_versions())))
-        max_lengths["V"] = max(max_lengths["V"], len(" ".join(asset_obj._create_version_obj(None).version_str)))
+        max_lengths["V"] = max(max_lengths["V"], len(" ".join(asset_obj.create_version_obj(None).version_str)))
         max_lengths["P"] = max(max_lengths["P"], len(" ".join(asset_obj.list_pins())))
+        max_lengths["N"] = max(max_lengths["N"], len(asset_obj.list_asset_notes().replace("\n", " - ")))
     print("\n\n")
 
     for char in args.format:
@@ -2866,7 +2873,7 @@ def subtask_set_pin(args,
         repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
         repo_obj.set_pin(uri=uri,
                          pin_n=args.pin,
-                         version_str=args.version,
+                         version=args.version,
                          log_str=log_str)
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
