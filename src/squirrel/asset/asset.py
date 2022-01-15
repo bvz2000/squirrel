@@ -12,7 +12,6 @@ from squirrel.asset.version import Version
 from squirrel.asset.pin import Pin
 from squirrel.asset.keywords import Keywords
 from squirrel.asset.keyvaluepairs import KeyValuePairs
-from squirrel.asset.thumbnails import Thumbnails
 import bvzversionedfiles
 
 from squirrel.shared.constants import *
@@ -279,8 +278,8 @@ class Asset(object):
         return False
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _create_version_obj(self,
-                            version_str=None) -> Version:
+    def create_version_obj(self,
+                           version_str=None) -> Version:
         """
         Given a version string, returns a version object. If the version_str is None, then the highest existing version
         number will be used.
@@ -325,7 +324,7 @@ class Asset(object):
         version_ints = self._get_all_version_numbers()
         for version_int in version_ints:
             version_str = self._version_str_from_int(version_int)
-            version_obj = self._create_version_obj(version_str)
+            version_obj = self.create_version_obj(version_str)
             output[version_obj.version_str] = version_obj
 
         return output
@@ -492,7 +491,7 @@ class Asset(object):
         current_version_obj = self.versions[current_version_str]
 
         new_version_num = self._get_next_available_ver_num()
-        new_version_obj = self._create_version_obj(new_version_num)
+        new_version_obj = self.create_version_obj(new_version_num)
 
         shutil.copytree(src=current_version_obj.version_d,
                         dst=new_version_obj.version_d,
@@ -532,7 +531,7 @@ class Asset(object):
             version_obj = self._carry_version_forward()
         else:
             new_version_num = self._get_next_available_ver_num()
-            version_obj = self._create_version_obj(new_version_num)
+            version_obj = self.create_version_obj(new_version_num)
             version_obj.create_dirs()
 
         return version_obj
@@ -834,7 +833,7 @@ class Asset(object):
         :return: Nothing.
         """
 
-        latest_version_obj = self._create_version_obj(None)
+        latest_version_obj = self.create_version_obj(None)
         # all_version_objs = self._get_all_versions()
 
         for version_obj in self.versions.values():
@@ -1129,7 +1128,7 @@ class Asset(object):
         :param notes:
                 A string of notes to add.
         :param overwrite:
-                If True, then the notes will overwrite the current set of notes. Otherwise they will be appended.
+                If True, then the notes will overwrite the current set of notes, otherwise they will be appended.
         :param version:
                 The version OR pin on which to set the notes. If the version is None, then the latest version will be
                 used. Defaults to None.
@@ -1142,7 +1141,7 @@ class Asset(object):
         assert type(overwrite) is bool
         assert version is None or type(version) is str or type(version) is int
 
-        version_obj = self._create_version_obj(version)
+        version_obj = self.create_version_obj(version)
         version_obj.add_notes(notes=notes,
                               overwrite=overwrite)
 
@@ -1162,7 +1161,7 @@ class Asset(object):
 
         assert version is None or type(version) is str or type(version) is int
 
-        version_obj = self._create_version_obj(version)
+        version_obj = self.create_version_obj(version)
         version_obj.delete_notes()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -1181,7 +1180,7 @@ class Asset(object):
 
         assert version is None or type(version) is str or type(version) is int
 
-        version_obj = self._create_version_obj(version)
+        version_obj = self.create_version_obj(version)
         return version_obj.list_notes()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -1194,7 +1193,7 @@ class Asset(object):
         :param notes:
                 A string of notes to add.
         :param overwrite:
-                If True, then the notes will overwrite the current set of notes. Otherwise they will be appended.
+                If True, then the notes will overwrite the current set of notes, otherwise they will be appended.
 
         :return:
                 Nothing.
@@ -1222,7 +1221,7 @@ class Asset(object):
     # ------------------------------------------------------------------------------------------------------------------
     def list_asset_notes(self):
         """
-        Display the notes for a asset as a whole. This is different than the notes set on individual versions.
+        Display the notes for an asset as a whole. This is different than the notes set on individual versions.
 
         :return:
                 Nothing.
