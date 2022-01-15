@@ -4,14 +4,13 @@ import re
 from pathlib import Path
 import shutil
 
-import bvzconfig
-import bvzfilesystemlib
 from squirrel.shared import libtext
 from squirrel.shared.squirrelerror import SquirrelError
 from squirrel.asset.version import Version
 from squirrel.asset.pin import Pin
 from squirrel.asset.keywords import Keywords
 from squirrel.asset.keyvaluepairs import KeyValuePairs
+from squirrel.asset.sourcefile import Sourcefile
 import bvzversionedfiles
 
 from squirrel.shared.constants import *
@@ -100,7 +99,6 @@ class Asset(object):
         assert os.path.isdir(asset_parent_d)
         assert name
         assert type(name) == str
-        assert type(config_obj) is bvzconfig.Config
 
         self.asset_n = name
         self.asset_parent_d = asset_parent_d.rstrip(os.sep) + os.sep
@@ -535,281 +533,230 @@ class Asset(object):
             version_obj.create_dirs()
 
         return version_obj
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _copy_single_file(self,
-                          src_p,
-                          dst_d,
-                          skip_regex,
-                          skip_links,
-                          verify_copy):
-        """
-        Copies a singe file given as src_p to the destination directory given as dst_d. File will actually be copied to
-        the data directory, and a symlink will be made in dst_d.
-
-        :param src_p:
-                The path to the source file to be copied.
-        :param dst_d:
-                The path to the destination DIRECTORY where the source file will APPEAR to be copied. In fact, the
-                file will be copied to the data directory and a symlink with the same name will be made in dst_d.
-        :param skip_regex:
-                A list of regex patterns to be used to skip copying specific files. If None, then all files will be
-                copied.
-        :param skip_links:
-                If True, then the file will be skipped if it is a symbolic link.
-        :param verify_copy:
-                If True, then each file will be checksummed before and after copying to make sure the copy worked as
-                expected.
-
-        :return:
-               Nothing.
-        """
-
-        assert os.path.exists(src_p)
-        assert not os.path.isdir(src_p)
-        assert os.path.exists(dst_d)
-        assert os.path.isdir(dst_d)
-        assert type(skip_regex) is list or skip_regex is None
-        assert type(skip_links) is bool
-        assert type(verify_copy) is bool
-
-        if skip_links and os.path.islink(src_p):
-            return
-
-        file_n = os.path.split(src_p)[1]
-
-        for pattern in skip_regex:
-            result = re.match(pattern, file_n)
-            if result:
-                return
-
-        bvzversionedfiles.copy_files_deduplicated(
-            sources_p=src_p,
-            dest_d=dst_d,
-            dest_n=file_n,
-            data_d=self.data_d,
-            ver_prefix="sqv",
-            num_digits=4,
-            do_verified_copy=verify_copy)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _copy_directory(self,
-                        src_d,
-                        dst_d,
-                        skip_regex,
-                        skip_links,
-                        skip_external_links,
-                        verify_copy):
-        """
-        Copies an entire directory given as src_p to the destination directory given as dst_d. Files will actually be
-        copied to the data directory, and symlinks to these files will be made in dst_d.
-
-        :param src_d:
-                The path to the directory to be copied.
-        :param dst_d:
-                The path to the destination DIRECTORY where the source file will appear to be copied. In fact, the
-                file will be copied to the data directory and symlink with the same name will be made in dst_d.
-        :param skip_regex:
-                A list of regex patterns to be used to skip copying specific files. If None, then all files will be
-                copied.
-        :param skip_links:
-                If True, then any symbolic links will be skipped. Otherwise, symlinks will be converted to regular files
-                and copied as though they were real files.
-        :param skip_external_links:
-                If True, then any symbolic links that point to files outside of the directory being copied will be
-                skipped.
-        :param verify_copy:
-                If True, then each file will be checksummed before and after copying to make sure the copy worked as
-                expected.
-
-        :return:
-                Nothing.
-        """
-
-        assert os.path.exists(src_d)
-        assert os.path.isdir(src_d)
-        assert os.path.exists(dst_d)
-        assert os.path.isdir(dst_d)
-        assert type(skip_regex) is list or skip_regex is None
-        assert type(skip_links) is bool
-        assert type(skip_external_links) is bool
-        assert type(verify_copy) is bool
-
-        # Walk through the entire source hierarchy
-        for dir_d, sub_dirs_n, files_n in os.walk(src_d):
-
-            # Build the relative path to the dir in the source dir
-            relative_d = os.path.relpath(dir_d, src_d)
-
-            # Build a parallel path in the destination dir
-            curr_dest_d = os.path.join(dst_d, relative_d)
-            if relative_d != "." and not os.path.exists(curr_dest_d):
-                os.mkdir(curr_dest_d)
-
-            # Now bring over all the files in this dir
-            for file_n in files_n:
-
-                source_p = os.path.join(src_d, dir_d, file_n)
-
-                if skip_external_links and os.path.islink(source_p):
-                    if not bvzfilesystemlib.symlink_source_is_in_dir(link_p=source_p, path_d=src_d):
-                        continue
-
-                self._copy_single_file(src_p=source_p,
-                                       dst_d=curr_dest_d,
-                                       skip_regex=skip_regex,
-                                       skip_links=skip_links,
-                                       verify_copy=verify_copy)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _copy_items(self,
-                    src_p,
-                    dst_d,
-                    skip_regex,
-                    skip_links,
-                    skip_external_links,
-                    verify_copy):
-        """
-        Copy the items from src_p to dst_d. (Actually files will be copied to the data directory and symlinks to these
-        files - with the original names - will be made in dst_d)
-
-        :param src_p:
-                A list of paths to the source files OR directories to be copied. Expects a list, and each file or dir in
-                the list must actually exist on disk.
-        :param dst_d:
-                The path to the destination DIRECTORY where the source file or files will APPEAR to be copied. In fact,
-                the file will be copied to the data directory and symlink with the same name will be made in dst_d.
-        :param skip_regex:
-                A list of regex patterns to be used to skip copying specific files. If None, then all files will be
-                copied.
-        :param skip_links:
-                If True, then any symbolic links will be skipped. Otherwise, symlinks will be converted to regular files
-                and copied as though they were real files.
-        :param skip_external_links:
-                If True, then any symbolic links that point to files outside of the directory being copied will be
-                skipped.
-        :param verify_copy:
-                If True, then each file will be checksummed before and after copying to make sure the copy worked as
-                expected.
-
-        :return:
-                Nothing.
-        """
-
-        assert type(src_p) is list
-        for item in src_p:
-            assert os.path.exists(item)
-        assert os.path.exists(dst_d)
-        assert os.path.isdir(dst_d)
-        assert type(skip_regex) is list or skip_regex is None
-        assert type(skip_links) is bool
-        assert type(skip_external_links) is bool
-        assert type(verify_copy) is bool
-
-        for src in src_p:
-            if not os.path.isdir(src):
-                self._copy_single_file(src_p=src,
-                                       dst_d=dst_d,
-                                       skip_regex=skip_regex,
-                                       skip_links=skip_links,
-                                       verify_copy=verify_copy)
-            else:
-                self._copy_directory(src_d=src,
-                                     dst_d=dst_d,
-                                     skip_regex=skip_regex,
-                                     skip_links=skip_links,
-                                     skip_external_links=skip_external_links,
-                                     verify_copy=verify_copy)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _check_file_count(self,
-                          dir_d):
-        """
-        Checks to see if the number of files in the passed directory is within the maximum number of files allowed to be
-        copied (as per the config object). Raises an error if the file count is greater than the limit.
-
-        :param dir_d:
-                The directory we are about to store.
-
-        :return:
-                Nothing.
-        """
-
-        file_count = bvzfilesystemlib.count_files_recursively(dir_d)
-        config_limit = self.config_obj.get_integer("preferences", "file_count_warning")
-        if file_count > config_limit:
-            err_msg = self.localized_resource_obj.get_error_msg(12000)
-            err_msg = err_msg.format(num_files=str(file_count), config_limit=str(config_limit))
-            raise SquirrelError(err_msg, 12000)
+    #
+    # # ----------------------------------------------------------------------------------------------------------------
+    # def _copy_single_file(self,
+    #                       source_obj,
+    #                       verify_copy):
+    #     """
+    #     Copies a singe file given as src_p to the destination directory given as dst_d. File will actually be copied
+    #     to
+    #     the data directory, and a symlink will be made in dst_d.
+    #
+    #     :param source_obj:
+    #             A Sourcefile object.
+    #     :param verify_copy:
+    #             If True, then each file will be checksummed before and after copying to make sure the copy worked as
+    #             expected.
+    #
+    #     :return:
+    #            Nothing.
+    #     """
+    #
+    #     assert type(source_obj) is Sourcefile
+    #     assert type(verify_copy) is bool
+    #
+    #     file_n = os.path.split(source_obj)[1]
+    #
+    #     bvzversionedfiles.copy_files_deduplicated(
+    #         sources_p=source_obj,
+    #         dest_d=dst_d,
+    #         dest_n=file_n,
+    #         data_d=self.data_d,
+    #         ver_prefix="sqv",
+    #         num_digits=4,
+    #         do_verified_copy=verify_copy)
+    #
+    # # ----------------------------------------------------------------------------------------------------------------
+    # def _copy_directory(self,
+    #                     src_d,
+    #                     dst_d,
+    #                     skip_regex,
+    #                     skip_links,
+    #                     skip_external_links,
+    #                     verify_copy):
+    #     """
+    #     Copies an entire directory given as src_p to the destination directory given as dst_d. Files will actually be
+    #     copied to the data directory, and symlinks to these files will be made in dst_d.
+    #
+    #     :param src_d:
+    #             The path to the directory to be copied.
+    #     :param dst_d:
+    #             The path to the destination DIRECTORY where the source file will appear to be copied. In fact, the
+    #             file will be copied to the data directory and symlink with the same name will be made in dst_d.
+    #     :param skip_regex:
+    #             A list of regex patterns to be used to skip copying specific files. If None, then all files will be
+    #             copied.
+    #     :param skip_links:
+    #             If True, then any symbolic links will be skipped. Otherwise, symlinks will be converted to regular les
+    #             and copied as though they were real files.
+    #     :param skip_external_links:
+    #             If True, then any symbolic links that point to files outside of the directory being copied will be
+    #             skipped.
+    #     :param verify_copy:
+    #             If True, then each file will be checksummed before and after copying to make sure the copy worked as
+    #             expected.
+    #
+    #     :return:
+    #             Nothing.
+    #     """
+    #
+    #     assert os.path.exists(src_d)
+    #     assert os.path.isdir(src_d)
+    #     assert os.path.exists(dst_d)
+    #     assert os.path.isdir(dst_d)
+    #     assert type(skip_regex) is list or skip_regex is None
+    #     assert type(skip_links) is bool
+    #     assert type(skip_external_links) is bool
+    #     assert type(verify_copy) is bool
+    #
+    #     # Walk through the entire source hierarchy
+    #     for dir_d, sub_dirs_n, files_n in os.walk(src_d):
+    #
+    #         # Build the relative path to the dir in the source dir
+    #         relative_d = os.path.relpath(dir_d, src_d)
+    #
+    #         # Build a parallel path in the destination dir
+    #         curr_dest_d = os.path.join(dst_d, relative_d)
+    #         if relative_d != "." and not os.path.exists(curr_dest_d):
+    #             os.mkdir(curr_dest_d)
+    #
+    #         # Now bring over all the files in this dir
+    #         for file_n in files_n:
+    #
+    #             source_p = os.path.join(src_d, dir_d, file_n)
+    #
+    #             if skip_external_links and os.path.islink(source_p):
+    #                 if not bvzfilesystemlib.symlink_source_is_in_dir(link_p=source_p, path_d=src_d):
+    #                     continue
+    #
+    #             self._copy_single_file(src_p=source_p,
+    #                                    dst_d=curr_dest_d,
+    #                                    skip_regex=skip_regex,
+    #                                    skip_links=skip_links,
+    #                                    verify_copy=verify_copy)
+    #
+    # # ----------------------------------------------------------------------------------------------------------------
+    # def _copy_items(self,
+    #                 src_p,
+    #                 dst_d,
+    #                 skip_links,
+    #                 skip_external_links,
+    #                 verify_copy):
+    #     """
+    #     Copy the items from src_p to dst_d. (Actually files will be copied to the data directory and symlinks to these
+    #     files - with the original names - will be made in dst_d)
+    #
+    #     :param src_p:
+    #             A list of paths to the source files OR directories to be copied. Expects a list, and each file or dir
+    #             in
+    #             the list must actually exist on disk.
+    #     :param dst_d:
+    #             The path to the destination DIRECTORY where the source file or files will APPEAR to be copied. In
+    #             fact,
+    #             the file will be copied to the data directory and symlink with the same name will be made in dst_d.
+    #     :param skip_links:
+    #             If True, then any symbolic links will be skipped. Otherwise, symlinks will be converted to regular
+    #             files
+    #             and copied as though they were real files.
+    #     :param skip_external_links:
+    #             If True, then any symbolic links that point to files outside of the directory being copied will be
+    #             skipped.
+    #     :param verify_copy:
+    #             If True, then each file will be checksummed before and after copying to make sure the copy worked as
+    #             expected.
+    #
+    #     :return:
+    #             Nothing.
+    #     """
+    #
+    #     assert type(src_p) is list
+    #     for item in src_p:
+    #         assert os.path.exists(item)
+    #     assert os.path.exists(dst_d)
+    #     assert os.path.isdir(dst_d)
+    #     assert type(skip_links) is bool
+    #     assert type(skip_external_links) is bool
+    #     assert type(verify_copy) is bool
+    #
+    #     for src in src_p:
+    #         if not os.path.isdir(src):
+    #             self._copy_single_file(src_p=src,
+    #                                    dst_d=dst_d,
+    #                                    skip_regex=skip_regex,
+    #                                    skip_links=skip_links,
+    #                                    verify_copy=verify_copy)
+    #         else:
+    #             self._copy_directory(src_d=src,
+    #                                  dst_d=dst_d,
+    #                                  skip_regex=skip_regex,
+    #                                  skip_links=skip_links,
+    #                                  skip_external_links=skip_external_links,
+    #                                  verify_copy=verify_copy)
+    #
+    # # ----------------------------------------------------------------------------------------------------------------
+    # --
+    # def _check_file_count(self,
+    #                       dir_d):
+    #     """
+    #     Checks to see if the number of files in the passed directory is within the maximum number of files allowed to
+    #     be
+    #     copied (as per the config object). Raises an error if the file count is greater than the limit.
+    #
+    #     :param dir_d:
+    #             The directory we are about to store.
+    #
+    #     :return:
+    #             Nothing.
+    #     """
+    #
+    #     file_count = bvzfilesystemlib.count_files_recursively(dir_d)
+    #     config_limit = self.config_obj.get_integer("preferences", "file_count_warning")
+    #     if file_count > config_limit:
+    #         err_msg = self.localized_resource_obj.get_error_msg(12000)
+    #         err_msg = err_msg.format(num_files=str(file_count), config_limit=str(config_limit))
+    #         raise SquirrelError(err_msg, 12000)
 
     # ------------------------------------------------------------------------------------------------------------------
     def store(self,
-              src_p,
+              sources_obj,
               merge,
-              skip_regex=None,
-              skip_links=False,
-              skip_external_links=True,
-              verify_copy=False,
-              ignore_file_count_limit=False):
+              verify_copy=False):
         """
-        Stores the directory or file given by src_p to a new version.
+        Stores the files given by sources_obj to a new version.
 
-        :param src_p:
-               The directory(s) or file(s) that we wish to store as a new version in this asset. Can accept either a
-               single path to a file or directory, or a list of paths.
+        :param sources_obj:
+               A list of objects of type Sourcefile that describe the files to be stored.
         :param merge:
-               If True, then this file or files will be merged with the files brought forward from the previous version.
-        :param skip_regex:
-               Regex pattern(s) to be used to skip copying specific files. Can accept either single pattern string or a
-               list of patterns. If None, then the regex pattern(s) (if they exist) will be taken from the config file.
-               Defaults to None.
-        :param skip_links:
-                If True, then any symbolic links will be skipped. Otherwise, symlinks will be converted to regular files
-                and copied as though they were real files.
-        :param skip_external_links:
-                If True, then any symbolic links that point to files outside of the directory being copied will be
-                skipped.
+               If True, then these files will be merged with the files brought forward from the previous version.
         :param verify_copy:
                If True, then each file will be checksummed before and after copying to make sure the copy worked as
                expected. Defaults to False.
-        :param ignore_file_count_limit: If True, then no matter how many files are about to be copied, go through with
-                the copy process. If not, throw an exception if more files than are defined in the config are about to
-                be copied. Defaults to False.
 
         :return:
                The version object where the data was stored.
         """
 
-        if type(src_p) != list:
-            src_p = [src_p]
-        for src in src_p:
-            assert os.path.exists(src)
-
-        if skip_regex is not None:
-            if type(skip_regex) != list:
-                skip_regex = [skip_regex]
-            for src in skip_regex:
-                assert type(src) == str
-        else:
-            skip_regex = self.config_obj.get_list("skip list regex")
-
-        assert type(merge) == bool
+        assert type(sources_obj) is list
+        for source_obj in sources_obj:
+            assert type(source_obj) is Sourcefile
+        assert type(merge) is bool
         assert type(verify_copy) == bool
-
-        if not ignore_file_count_limit:
-            for src in src_p:
-                if os.path.isdir(src):
-                    self._check_file_count(src)
 
         version_obj = self._create_version(merge)
         self.versions[version_obj.version_str] = version_obj
 
-        self._copy_items(src_p=src_p,
-                         dst_d=version_obj.version_d,
-                         skip_regex=skip_regex,
-                         skip_links=skip_links,
-                         skip_external_links=skip_external_links,
-                         verify_copy=verify_copy)
+        sources = dict()
+        for source_obj in sources_obj:
+            sources[source_obj.source_p] = source_obj.dest_relative_p
+
+        bvzversionedfiles.copy_files_deduplicated(
+            sources=sources,
+            dest_d=version_obj.version_d,
+            data_d=self.data_d,
+            ver_prefix="sqv",
+            num_digits=4,
+            do_verified_copy=verify_copy)
 
         # Create the default pin (if the config is set up to do that)
         if self.config_obj.get_boolean("preferences", "auto_create_default_pin"):
