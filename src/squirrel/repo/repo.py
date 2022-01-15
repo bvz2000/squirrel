@@ -19,7 +19,7 @@ class Repo(object):
     Some terminology:
     -----------------
     Repository (repo):
-            A repository is a series of directories on disk. A repo may contain multiple levels (nested sub-directories)
+            A repository is a series of directories on disk. A repo may contain multiple levels (nested subdirectories)
             which define the repo structure. At the very ends of these nested directories are the actual assets being
             stored in the repository. There may be any number of repos on a filesystem.
     URI path:
@@ -33,7 +33,7 @@ class Repo(object):
     Structure:
             Repositories are defined by a directory structure consisting of "blessed" directories (and no files). A
             directory is "blessed" if it contains a .repo or .repo_root file in it. This structure defines the hierarchy
-            of the repo, with each sub-directory making up the "branches" of the repo. The very last sub-directory of
+            of the repo, with each subdirectory making up the "branches" of the repo. The very last subdirectory of
             each branch is considered a "leaf" structure. No files may live at any level of the structure. Only
             "blessed" directories may live within the repo structure. Likewise, no non-blessed directories may live at
             any level of the structure except within the final, leaf level. At this leaf level are the actual asset
@@ -60,13 +60,13 @@ class Repo(object):
     Repositories are simply "blessed" directories on disk. The root level of a repository is just a normal directory,
     but it has a hidden file in it called ".repo_root".
 
-    There may be any number of sub-directories inside of this root directory, and any number of levels of these
+    There may be any number of subdirectories inside of this root directory, and any number of levels of these
     subdirectories.  Each of these directories is identified as being the "structure" of the repository by containing a
     hidden file in it called ".repo". The contents of this file is currently ignored. It exists merely as a semaphore to
     indicate a "blessed" directory. In the future metadata about that particular branch of the repo structure may be
     stored within this file.
 
-    The very last level of sub-directories that are part of the repo structure (i.e. the final directory that contains a
+    The very last level of subdirectories that are part of the repo structure (i.e. the final directory that contains a
     ".repo" files in them) are considered leaf structure dirs. Only these directories may contain anything other than
     other structure dirs, and they may only contain asset dirs.
 
@@ -132,7 +132,7 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def is_repo(self):
         """
-        Returns whether the current path for the repo is actually an repo (contains a .repo_root semaphore file).
+        Returns whether the current path for the repo is actually a repo (contains a .repo_root semaphore file).
 
         :return:
             True if the Asset refers to an actual asset on disk (has a .asset semaphore file). False otherwise.
@@ -780,7 +780,7 @@ class Repo(object):
         :param dir_p:
                 The full path to the directory being blessed.
         :param root:
-                If True, then this is a root dir. Otherwise it is a normal structure dir.
+                If True, then this is a root dir, otherwise it is a normal structure dir.
 
         :return:
                 Nothing.
@@ -830,7 +830,7 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def bless_repo(self):
         """
-        Blesses every sub-directory in the hierarchy under self.repo_root_d. Does not descend into directories that are
+        Blesses every subdirectory in the hierarchy under self.repo_root_d. Does not descend into directories that are
         asset directories.
 
         :return: Nothing.
@@ -1420,7 +1420,7 @@ class Repo(object):
         :param uri:
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
         :param keywords:
-                A list of keywords to add. Keywords are case insensitive.
+                A list of keywords to add. Keywords are case-insensitive.
 
         :return:
                 Nothing.
@@ -1455,7 +1455,7 @@ class Repo(object):
         :param uri:
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
         :param keywords:
-                A list of keywords to delete. Keywords are case insensitive.
+                A list of keywords to delete. Keywords are case-insensitive.
 
         :return:
                 Nothing.
@@ -1609,7 +1609,7 @@ class Repo(object):
         :param uri:
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
         :param metadata_keys:
-                A list of metadata keys to delete. Keys are case insensitive.
+                A list of metadata keys to delete. Keys are case-insensitive.
 
         :return:
                 Nothing.
@@ -1707,7 +1707,7 @@ class Repo(object):
                 The version or pin on which to set the notes. If None, then the latest version will be used. Defaults to
                 None.
         :param overwrite:
-                If True, then the notes will overwrite the current set of notes. Otherwise they will be appended.
+                If True, then the notes will overwrite the current set of notes, otherwise they will be appended.
                 Defaults to False.
         :param log_str:
                 A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
@@ -1795,7 +1795,7 @@ class Repo(object):
         :param uri:
                 The asset URI.
         :param overwrite:
-                If True, then the notes will overwrite the current set of notes. Otherwise they will be appended.
+                If True, then the notes will overwrite the current set of notes, otherwise they will be appended.
                 Defaults to False.
         :param log_str:
                 A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
