@@ -1,7 +1,7 @@
 import errno
 import os
-import re
 from pathlib import Path
+import re
 import shutil
 
 from squirrel.shared import libtext
@@ -10,8 +10,8 @@ from squirrel.asset.version import Version
 from squirrel.asset.pin import Pin
 from squirrel.asset.keywords import Keywords
 from squirrel.asset.keyvaluepairs import KeyValuePairs
-from squirrel.asset.sourcefile import Sourcefile
-import bvzversionedfiles
+import bvzversionedfiles.bvzversionedfiles as bvzversionedfiles
+from bvzversionedfiles.copydescriptor import Copydescriptor
 
 from squirrel.shared.constants import *
 
@@ -719,14 +719,14 @@ class Asset(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def store(self,
-              sources_obj,
+              copydescriptors,
               merge,
               verify_copy=False):
         """
         Stores the files given by sources_obj to a new version.
 
-        :param sources_obj:
-               A list of objects of type Sourcefile that describe the files to be stored.
+        :param copydescriptors:
+               A list of objects of type Copydescriptor that describe the files to be stored.
         :param merge:
                If True, then these files will be merged with the files brought forward from the previous version.
         :param verify_copy:
@@ -737,21 +737,17 @@ class Asset(object):
                The version object where the data was stored.
         """
 
-        assert type(sources_obj) is list
-        for source_obj in sources_obj:
-            assert type(source_obj) is Sourcefile
+        assert type(copydescriptors) is list
+        for copydescriptor in copydescriptors:
+            assert type(copydescriptor) is Copydescriptor
         assert type(merge) is bool
         assert type(verify_copy) == bool
 
         version_obj = self._create_version(merge)
         self.versions[version_obj.version_str] = version_obj
 
-        sources = dict()
-        for source_obj in sources_obj:
-            sources[source_obj.source_p] = source_obj.dest_relative_p
-
         bvzversionedfiles.copy_files_deduplicated(
-            sources=sources,
+            copydescriptors=copydescriptors,
             dest_d=version_obj.version_d,
             data_d=self.data_d,
             ver_prefix="sqv",
