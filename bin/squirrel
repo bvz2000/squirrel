@@ -385,6 +385,15 @@ def initial_parser_setup(localization_obj):
     setup_delete_pin_parser(sub_parser=sub_parser_obj,
                             localization_obj=localization_obj)
 
+    # publish -----------------------------------------
+    help_str = localization_obj.get_msg("publish_help")
+    sub_parser_obj = sub_parser.add_parser(name="publish",
+                                           aliases=['p'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_publish_parser(sub_parser=sub_parser_obj,
+                         localization_obj=localization_obj)
+
     # # add-log
     # help_str = localization_obj.get_msg("append_log_help")
     # append_log_parser = sub_parser.add_parser(name="append-log",
@@ -1480,6 +1489,64 @@ def setup_delete_pin_parser(sub_parser,
                             dest="pin",
                             type=str,
                             required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_publish_parser(sub_parser,
+                         localization_obj):
+    """
+    Sets up the publish sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("publish_uri_path_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("publish_source_paths_required_helpstr")
+    sub_parser.add_argument("-p",
+                            metavar="source-paths",
+                            dest="source_paths",
+                            nargs="+",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("publish_clean_publish_optional_helpstr")
+    sub_parser.add_argument("-C",
+                            "--clean-publish",
+                            dest="clean_publish",
+                            action="store_true",
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("publish_verify_copy_optional_helpstr")
+    sub_parser.add_argument("-v",
+                            "--verified-copy",
+                            dest="verified_copy",
+                            action="store_true",
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("publish_link_in_place_optional_helpstr")
+    sub_parser.add_argument("-L",
+                            "--link-in-place",
+                            dest="link_in_place",
+                            action="store_true",
                             help=help_str)
 
     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
@@ -2914,6 +2981,44 @@ def subtask_delete_pin(args,
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_publish(args,
+                    repo_manager_obj,
+                    localization_obj,
+                    log_str):
+    """
+    Publish an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=True,
+                                                name_required=True,
+                                                name_must_exist=False)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.publish(uri=uri,
+                         items=args.source_paths,
+                         merge=not args.clean_publish,
+                         do_verified_copy=args.verified_copy,
+                         link_in_place=args.link_in_place)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
 #
 # # ----------------------------------------------------------------------------------------------------------------------
 # def subtask_quick_store(args,
@@ -3588,6 +3693,10 @@ def run_sub_task(args,
 
         if args.sub_task.upper() in ["DELETE-PIN", "DP"]:
             subtask_delete_pin(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["PUBLISH", "P"]:
+            subtask_publish(args, repo_manager_obj, localization_obj, log_str)
             return
 
     except SquirrelError as e:
