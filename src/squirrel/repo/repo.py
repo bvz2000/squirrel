@@ -2,6 +2,10 @@ import configparser
 import os
 import pathlib
 
+import bvzfilesystemlib
+
+from bvzversionedfiles.copydescriptor import Copydescriptor
+
 from squirrel.asset.asset import Asset
 from squirrel.shared import urilib
 from squirrel.shared.squirrelerror import SquirrelError
@@ -1961,6 +1965,157 @@ class Repo(object):
             log_str = log_str.format(pin=pin_n)
             asset_obj.append_to_log(log_str)
 
+    # ------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _file_list_to_copydescriptors(items,
+                                      link_in_place):
+        """
+        Given a list of files, return a list of copydescriptors.
+
+        :param items:
+                A list of files.
+        :param link_in_place:
+                If True, then each file will be set to link in place.
+
+        :return:
+                A list of copydescriptor objects.
+        """
+
+        copydescriptors = list()
+
+        for item in items:
+            try:
+                copydescriptor = Copydescriptor(source_p=item,
+                                                dest_relative_p=os.path.split(item)[1],
+                                                link_in_place=link_in_place)
+                copydescriptors.append(copydescriptor)
+            except ValueError as e:
+                raise SquirrelError(str(e), 5001)
+
+        return copydescriptors
+
+    # ------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _directory_to_copydescriptors(dir_d,
+                                      link_in_place):
+        """
+        Given a directory, return a list of copydescriptors.
+
+        :param dir_d:
+                A directory, all children of which will be converted to copydescriptors.
+        :param link_in_place:
+                If True, then each file will be set to link in place.
+
+        :return:
+                A list of copydescriptor objects.
+        """
+
+        copydescriptors = list()
+
+        for path, currentDirectory, files_n in os.walk(dir_d):
+            for file_n in files_n:
+                source_p = os.path.join(path, file_n)
+                dest_relative_p = source_p.split(dir_d)[1]
+                try:
+                    copydescriptor = Copydescriptor(source_p=source_p,
+                                                    dest_relative_p=dest_relative_p,
+                                                    link_in_place=link_in_place)
+                except ValueError as e:
+                    raise SquirrelError(str(e), 5000)
+                copydescriptors.append(copydescriptor)
+
+        return copydescriptors
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _is_file_list(self,
+                      items):
+        """
+        Given a list of items that are either files or a directory, determine whether it is a list of files or a single
+        directory. Also verify that it is not a mix of the two and, if it is a directory, there is only a single entry.
+
+        :param items:
+                A list of files or a list of a single directory. May not mix both types. May not be more than one
+                directory if it is a directory.
+
+        :return:
+                True if it is a list of files. False if it is a single directory.
+        """
+
+        item_types = None
+        for item in items:
+            if not os.path.exists(item):
+                err_msg = self.localized_resource_obj.get_error_msg(2000)
+                err_msg = err_msg.format(file_p=item)
+                raise SquirrelError(err_msg, 2000)
+            if os.path.isfile(item):
+                if not item_types:
+                    item_types = "file"
+                elif item_types != "file":
+                    err_msg = self.localized_resource_obj.get_error_msg(2001)
+                    raise SquirrelError(err_msg, 2001)
+            elif os.path.isdir(item):
+                if not item_types:
+                    item_types = "dir"
+                elif item_types != "dir":
+                    err_msg = self.localized_resource_obj.get_error_msg(2001)
+                    raise SquirrelError(err_msg, 2001)
+                if len(items) > 1:
+                    err_msg = self.localized_resource_obj.get_error_msg(2002)
+                    raise SquirrelError(err_msg, 2002)
+
+        return item_types == "file"
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def publish(self,
+                uri,
+                items,
+                merge,
+                do_verified_copy,
+                link_in_place=False):
+        """
+        Publishes a set of files or directory to an asset.
+
+        :param uri:
+                The URI of the asset.
+        :param items:
+                A list of items to publish. Either a list of files, or a single directory. May not be a mix of files and
+                directories. May not be multiple directories.
+        :param merge:
+                If True, then merge the current publish with any files that were in the previous version (if there was a
+                previous version).
+        :param do_verified_copy:
+                If True, then each file will be verified that it copied correctly by using an md5 checksum.
+        :param link_in_place:
+                If True, then the files will not be copied, but instead symlinks to the original files will be published
+                instead. Defaults to False.
+
+        :return:
+                Nothing.
+        """
+
+        assert type(uri) is str
+        assert type(items) is list
+
+        if self._is_file_list(items):
+            copydescriptors = self._file_list_to_copydescriptors(items=items,
+                                                                 link_in_place=link_in_place)
+        else:
+            copydescriptors = self._directory_to_copydescriptors(dir_d=items[0],
+                                                                 link_in_place=link_in_place)
+
+        uri_path = uri.split(":/")[1].split("#")[0]
+        asset_n = uri.split(":/")[1].split("#")[1]
+
+        asset_parent_d = self._get_publish_path(uri_path)
+        asset_obj = Asset(asset_parent_d=asset_parent_d,
+                          name=asset_n,
+                          config_obj=self.config_obj,
+                          localized_resource_obj=self.localized_resource_obj)
+
+        asset_obj.store(copydescriptors=copydescriptors,
+                        merge=merge,
+                        verify_copy=do_verified_copy)
+
     # # ------------------------------------------------------------------------------------------------------------------
     # def add_thumbnails(self,
     #                    version,
@@ -2020,8 +2175,8 @@ class Repo(object):
     #         asset_obj.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def get_publish_path(self,
-                         uri_path):
+    def _get_publish_path(self,
+                          uri_path):
         """
         Returns the path where an asset should be stored based on its uri_path.
 
