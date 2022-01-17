@@ -73,7 +73,8 @@ class RepoManager(object):
                          uri,
                          repo_required=False,
                          path_required=False,
-                         name_required=False):
+                         name_required=False,
+                         name_must_exist=True):
         """
         Given a partial uri, try to create a full, legal, existing uri (this includes the asset name). The format of a
         full URI is as follows:
@@ -124,6 +125,8 @@ class RepoManager(object):
                 If true, then a path is required (may be a partial path). Defaults to False.
         :param name_required:
                 If True, then the asset name is a required part of the URI. Defaults to False.
+        :param name_must_exist:
+                If True, then the name (if provided) must exist as an existing asset on disk.
 
         :return:
                 A three item tuple consisting of the repo, path, and asset name. If any of those are missing and not
@@ -164,7 +167,7 @@ class RepoManager(object):
         # Split up the string into a repo and the remaining text.
         try:
             repo_n, remaining_str = uri.split(":/", maxsplit=1)
-        except ValueError:
+        except ValueError:  # There is no repo name
             repo_n = ""
             remaining_str = uri
 
@@ -213,7 +216,8 @@ class RepoManager(object):
                 err_msg = err_msg.format(uri_path=uri_path)
                 raise SquirrelError(err_msg, 907)
 
-        if asset_n:
+        # If there is an asset name, validate it
+        if asset_n and name_must_exist:
 
             sql = self.sql_resources.get("disambiguate_uri", "asset_name_exists")
             rows = self.cursor.execute(sql, (repo_n, asset_n)).fetchall()
