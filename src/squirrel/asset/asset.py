@@ -820,15 +820,12 @@ class Asset(object):
 
         version_obj = self._version_obj_from_version_str(version_str)
 
-        try:
-            pin_obj = self.pins[pin_n]
-        except KeyError:
-            pin_obj = Pin(pin_n=pin_n,
-                          asset_d=self.asset_d,
-                          version_obj=version_obj,
-                          is_locked=lock,
-                          localized_resource_obj=self.localized_resource_obj,
-                          config_obj=self.config_obj)
+        pin_obj = Pin(pin_n=pin_n,
+                      asset_d=self.asset_d,
+                      version_obj=version_obj,
+                      is_locked=lock,
+                      localized_resource_obj=self.localized_resource_obj,
+                      config_obj=self.config_obj)
 
         pin_obj.create_link(allow_delete_locked)
 
