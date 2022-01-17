@@ -277,7 +277,8 @@ class Asset(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def create_version_obj(self,
-                           version_str=None) -> Version:
+                           version_str=None,
+                           version_must_exist=True) -> Version:
         """
         Given a version string, returns a version object. If the version_str is None, then the highest existing version
         number will be used.
@@ -285,6 +286,8 @@ class Asset(object):
         :param version_str:
                 A string version or None. If None, then the highest available version number will be used. Defaults to 
                 None.
+        :param version_must_exist:
+                If True, an error is raised if the version does not exist on disk. Defaults to True.
 
         :return:
                 A version object.
@@ -296,7 +299,7 @@ class Asset(object):
             version_int = self._get_highest_ver_num()
             version_str = self._version_str_from_int(version_int=version_int)
 
-        if not self._version_exists(version_str):
+        if not self._version_exists(version_str) and version_must_exist:
             err_msg = self.localized_resource_obj.get_error_msg(11000)
             err_msg = err_msg.format(version=str(version_str))
             raise SquirrelError(err_msg, 11000)
@@ -489,7 +492,9 @@ class Asset(object):
         current_version_obj = self.versions[current_version_str]
 
         new_version_num = self._get_next_available_ver_num()
-        new_version_obj = self.create_version_obj(new_version_num)
+        new_version_str = self._version_str_from_int(new_version_num)
+        new_version_obj = self.create_version_obj(version_str=new_version_str,
+                                                  version_must_exist=False)
 
         shutil.copytree(src=current_version_obj.version_d,
                         dst=new_version_obj.version_d,
@@ -529,7 +534,9 @@ class Asset(object):
             version_obj = self._carry_version_forward()
         else:
             new_version_num = self._get_next_available_ver_num()
-            version_obj = self.create_version_obj(new_version_num)
+            new_version_str = self._version_str_from_int(new_version_num)
+            version_obj = self.create_version_obj(version_str=new_version_str,
+                                                  version_must_exist=False)
             version_obj.create_dirs()
 
         return version_obj
@@ -755,8 +762,8 @@ class Asset(object):
             do_verified_copy=verify_copy)
 
         # Create the default pin (if the config is set up to do that)
-        if self.config_obj.get_boolean("preferences", "auto_create_default_pin"):
-            pin_name = self.config_obj.get_string("preferences", "default_pin_name").upper()
+        if self.config_obj.get_boolean("asset_settings", "auto_create_default_pin"):
+            pin_name = self.config_obj.get_string("asset_settings", "default_pin_name").upper()
             pin_obj = self.set_pin(pin_n=pin_name,
                                    version_str=version_obj.version_str,
                                    lock=True,
