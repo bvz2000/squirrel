@@ -2116,6 +2116,8 @@ class Repo(object):
                         merge=merge,
                         verify_copy=do_verified_copy)
 
+        # TODO: Have to update the cache with this newly published asset/version.
+
     # # ------------------------------------------------------------------------------------------------------------------
     # def add_thumbnails(self,
     #                    version,
