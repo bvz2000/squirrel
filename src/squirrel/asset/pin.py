@@ -27,7 +27,7 @@ class Pin(object):
         :param asset_d:
                 The path to the asset root.
         :param version_obj:
-                The version object this pin points to. If None, then this pin is not yet connected to a version.
+                The version object this pin references. If None, then this pin is not yet connected to a version.
                 Defaults to None.
         :param is_locked:
                 A boolean determining whether this pin is locked against deletion or not.
@@ -101,12 +101,16 @@ class Pin(object):
 
         self.delete_link(allow_delete_locked=allow_delete_locked)
 
-        src = "./" + self.version_obj.version_str
+        src = "/" + self.version_obj.version_str
         dst = os.path.join(".", self.asset_d, self.pin_n)
+        if os.path.islink(dst):
+            os.unlink(dst)
         os.symlink(src, dst)
 
         src = "./" + self.version_obj.metadata_str
         dst = os.path.join(".", self.asset_d, "." + self.pin_n)
+        if os.path.islink(dst):
+            os.unlink(dst)
         os.symlink(src, dst)
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -148,7 +152,7 @@ class Pin(object):
         Returns the version object associated with the pin
 
         :return:
-                The version this pin points to. If it does not exist, returns None.
+                The version this pin references. If it does not exist, returns None.
         """
 
         return self.version_obj
