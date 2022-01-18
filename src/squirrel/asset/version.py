@@ -343,7 +343,7 @@ class Version(object):
                 on.
         :param pins:
                 A dictionary of pins and the version objects they point to. Necessary because we cannot delete this
-                version if any pin points to it.
+                version if any pin references it.
 
         :return:
                 Nothing.
@@ -352,9 +352,10 @@ class Version(object):
         # TODO: MOVE TO ASSET LAYER
         linked_pins = list()
 
-        for pin, version_obj in pins:
+        for pin_n, pin_obj in pins.items():
+            version_obj = pin_obj.version_obj
             if version_obj.version_int == self.version_int:
-                linked_pins.append(pin)
+                linked_pins.append(pin_n)
 
         if linked_pins:
             err_msg = self.localized_resource_obj.get_error_msg(13001)
