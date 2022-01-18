@@ -2118,6 +2118,34 @@ class Repo(object):
 
         # TODO: Have to update the cache with this newly published asset/version.
 
+    # ------------------------------------------------------------------------------------------------------------------
+    def collapse(self,
+                 uri):
+        """
+        Removes all versions from an asset except the latest version.
+
+        :param uri:
+                The URI of the asset.
+
+        :return:
+                Nothing.
+        """
+
+        assert type(uri) is str
+
+        uri_path = uri.split(":/")[1].split("#")[0]
+        asset_n = uri.split(":/")[1].split("#")[1]
+
+        asset_parent_d = self._get_publish_path(uri_path)
+        asset_obj = Asset(asset_parent_d=asset_parent_d,
+                          name=asset_n,
+                          config_obj=self.config_obj,
+                          localized_resource_obj=self.localized_resource_obj)
+
+        asset_obj.collapse()
+
+        # TODO: Have to update the cache with this newly published asset/version.
+
     # # ------------------------------------------------------------------------------------------------------------------
     # def add_thumbnails(self,
     #                    version,
