@@ -601,12 +601,13 @@ class Asset(object):
         """
 
         latest_version_obj = self.create_version_obj(None)
-        # all_version_objs = self._get_all_versions()
+        all_version_objs = list(self.versions.values())
 
         for version_obj in self.versions.values():
             if version_obj.version_int != latest_version_obj.version_int:
-                version_obj.delete_version(all_version_objs=self.versions.values(),
+                version_obj.delete_version(all_version_objs=all_version_objs,
                                            pins=self.pins)
+                all_version_objs.remove(version_obj)
 
     # ------------------------------------------------------------------------------------------------------------------
     def set_pin(self,
