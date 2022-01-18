@@ -117,8 +117,6 @@ def initial_parser_setup(localization_obj):
     #  add thumbnails,
     #  list thumbnails,
     #  delete thumbnails,
-    #  publish asset,
-    #  flatten asset,
     #  list asset disk space usage,
     #  delete asset version
     #  add log,
@@ -393,6 +391,15 @@ def initial_parser_setup(localization_obj):
                                            help=help_str)
     setup_publish_parser(sub_parser=sub_parser_obj,
                          localization_obj=localization_obj)
+
+    # collapse -----------------------------------------
+    help_str = localization_obj.get_msg("collapse_help")
+    sub_parser_obj = sub_parser.add_parser(name="collapse",
+                                           aliases=['c'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_collapse_parser(sub_parser=sub_parser_obj,
+                          localization_obj=localization_obj)
 
     # # add-log
     # help_str = localization_obj.get_msg("append_log_help")
@@ -1547,6 +1554,34 @@ def setup_publish_parser(sub_parser,
                             "--link-in-place",
                             dest="link_in_place",
                             action="store_true",
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_collapse_parser(sub_parser,
+                          localization_obj):
+    """
+    Sets up the collapse sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("collapse_uri_path_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
                             help=help_str)
 
     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
@@ -3019,6 +3054,51 @@ def subtask_publish(args,
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_collapse(args,
+                     repo_manager_obj,
+                     localization_obj,
+                     log_str):
+    """
+    Collapse an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    # verify that they want to actually do this
+    msg = localization_obj.get_msg("collapse_are_you_sure")
+    print(msg)
+    msg = localization_obj.get_msg("collapse_continue")
+    msg = msg.format(asset=args.uri.split("#")[1])
+    result = input(msg)
+    if not result.upper() == "YES":
+        msg = localization_obj.get_msg("canceled")
+        print(msg)
+        return
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=True,
+                                                name_required=True,
+                                                name_must_exist=False)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.collapse(uri=uri)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
 #
 # # ----------------------------------------------------------------------------------------------------------------------
 # def subtask_quick_store(args,
@@ -3697,6 +3777,10 @@ def run_sub_task(args,
 
         if args.sub_task.upper() in ["PUBLISH", "P"]:
             subtask_publish(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["COLLAPSE", "C"]:
+            subtask_collapse(args, repo_manager_obj, localization_obj, log_str)
             return
 
     except SquirrelError as e:
