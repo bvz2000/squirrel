@@ -101,7 +101,7 @@ class Pin(object):
 
         self.delete_link(allow_delete_locked=allow_delete_locked)
 
-        src = "/" + self.version_obj.version_str
+        src = "./" + self.version_obj.version_str
         dst = os.path.join(".", self.asset_d, self.pin_n)
         if os.path.islink(dst):
             os.unlink(dst)
