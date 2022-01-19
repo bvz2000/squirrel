@@ -721,7 +721,6 @@ class Asset(object):
 
         :param pin_n:
                 The name of the pin to be removed.
-
         :param allow_delete_locked:
                 If True, then locked pins may be deleted. If False, then locked pins may not be deleted. Defaults to
                 True.
@@ -742,6 +741,58 @@ class Asset(object):
                                     pin_must_exist=True,
                                     version_str=None)
         pin_obj.delete_link(allow_delete_locked)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def lock_pin(self,
+                 pin_n):
+        """
+        Locks a pin on the asset.
+
+        :param pin_n:
+                The name of the pin to be removed.
+
+        :return:
+                A list of all the (user-defined) pins in the asset.
+        """
+
+        assert type(pin_n) is str
+
+        pin_n = pin_n.upper()
+        if not self._pin_exists(pin_n):
+            err_msg = self.localized_resource_obj.get_error_msg(1234)
+            err_msg = err_msg.format(pin_n=pin_n)
+            raise SquirrelError(err_msg, 1234)
+
+        pin_obj = self._new_pin_obj(pin_n=pin_n,
+                                    pin_must_exist=True,
+                                    version_str=None)
+        pin_obj.lock()
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def unlock_pin(self,
+                   pin_n):
+        """
+        unlocks a pin on the asset.
+
+        :param pin_n:
+                The name of the pin to be removed.
+
+        :return:
+                A list of all the (user-defined) pins in the asset.
+        """
+
+        assert type(pin_n) is str
+
+        pin_n = pin_n.upper()
+        if not self._pin_exists(pin_n):
+            err_msg = self.localized_resource_obj.get_error_msg(1234)
+            err_msg = err_msg.format(pin_n=pin_n)
+            raise SquirrelError(err_msg, 1234)
+
+        pin_obj = self._new_pin_obj(pin_n=pin_n,
+                                    pin_must_exist=True,
+                                    version_str=None)
+        pin_obj.unlock()
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_pins(self):
