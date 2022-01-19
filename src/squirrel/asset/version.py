@@ -333,47 +333,23 @@ class Version(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_version(self,
-                       all_version_objs,
-                       pins):
+                       files_to_keep):
         """
-        Deletes the current version.
+        Deletes the current version. Needs a list of files in the .data directory that should not be deleted (because
+        these files are also referenced by another version).
 
-        :param all_version_objs:
-                A list of all version objects. Necessary so that we don't remove any data files that they may be relying
-                on.
-        :param pins:
-                A dictionary of pins and the version objects they point to. Necessary because we cannot delete this
-                version if any pin references it.
+        :param files_to_keep:
+                A list of files in the data directory that we do NOT want to delete. Essentially this would be a list of
+                files that are in the other versions.
 
         :return:
                 Nothing.
         """
 
-        # TODO: MOVE TO ASSET LAYER
-        linked_pins = list()
-
-        for pin_n, pin_obj in pins.items():
-            version_obj = pin_obj.version_obj
-            if version_obj.version_int == self.version_int:
-                linked_pins.append(pin_n)
-
-        if linked_pins:
-            err_msg = self.localized_resource_obj.get_error_msg(13001)
-            err_msg = err_msg.format(version=self.version_str,
-                                     pin=", ".join(linked_pins))
-            raise SquirrelError(err_msg, 13001)
-
-        target_files_to_delete = self.user_data_files()
-
-        target_files_to_keep = list()
-        for version_obj in all_version_objs:
-            if version_obj.version_int != self.version_int:
-                target_files_to_keep.extend(version_obj.user_data_files())
-        target_files_to_keep = list(set(target_files_to_keep))
-
-        for delete_target in target_files_to_delete:
-            if delete_target not in target_files_to_keep:
-                os.remove(delete_target)
+        files_to_delete = self.user_data_files()
+        for file_to_delete in files_to_delete:
+            if file_to_delete not in files_to_keep:
+                os.remove(file_to_delete)
 
         shutil.rmtree(self.version_d, ignore_errors=True)
         shutil.rmtree(self.version_metadata_d, ignore_errors=True)
