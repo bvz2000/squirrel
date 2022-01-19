@@ -383,6 +383,24 @@ def initial_parser_setup(localization_obj):
     setup_delete_pin_parser(sub_parser=sub_parser_obj,
                             localization_obj=localization_obj)
 
+    # lock-pin -----------------------------------------
+    help_str = localization_obj.get_msg("lock_pin_help")
+    sub_parser_obj = sub_parser.add_parser(name="lock-pin",
+                                           aliases=['lp'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_lock_pin_parser(sub_parser=sub_parser_obj,
+                          localization_obj=localization_obj)
+
+    # unlock-pin -----------------------------------------
+    help_str = localization_obj.get_msg("unlock_pin_help")
+    sub_parser_obj = sub_parser.add_parser(name="unlock-pin",
+                                           aliases=['up'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_unlock_pin_parser(sub_parser=sub_parser_obj,
+                            localization_obj=localization_obj)
+
     # publish -----------------------------------------
     help_str = localization_obj.get_msg("publish_help")
     sub_parser_obj = sub_parser.add_parser(name="publish",
@@ -1503,6 +1521,78 @@ def setup_delete_pin_parser(sub_parser,
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+def setup_lock_pin_parser(sub_parser,
+                          localization_obj):
+    """
+    Sets up the lock pin sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("lock_pin_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("lock_pin_pin_required_helpstr")
+    sub_parser.add_argument("-p",
+                            metavar="pin",
+                            dest="pin",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_unlock_pin_parser(sub_parser,
+                            localization_obj):
+    """
+    Sets up the unlock pin sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("unlock_pin_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("unlock_pin_pin_required_helpstr")
+    sub_parser.add_argument("-p",
+                            metavar="pin",
+                            dest="pin",
+                            type=str,
+                            required=True,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 def setup_publish_parser(sub_parser,
                          localization_obj):
     """
@@ -2215,14 +2305,14 @@ def print_asset_data(asset_obj,
         print(" ".join(output).ljust(max_lengths[char], " "), end="")
 
     if char == "v":
-        versions = asset_obj.list_versions()
+        versions = asset_obj._get_all_version_strings()
         versions.sort()
         print("  | ", end="")
         print(" ".join(versions).ljust(max_lengths[char], " "), end="")
 
     if char == "V":
         print("  | ", end="")
-        print(asset_obj.create_version_obj(None).version_str.ljust(max_lengths[char]), end="")
+        print(asset_obj._new_version_obj(None).version_str.ljust(max_lengths[char]), end="")
 
     if char == "P":
         print("  | ", end="")
@@ -2358,8 +2448,8 @@ def subtask_list_assets(args,
         max_lengths["k"] = max(max_lengths["k"], len(" ".join(asset_obj.list_keywords())))
         metadata = [f"{k}={v}" for k, v in asset_obj.list_key_value_pairs().items()]
         max_lengths["m"] = max(max_lengths["m"], len(" ".join(metadata)))
-        max_lengths["v"] = max(max_lengths["v"], len(" ".join(asset_obj.list_versions())))
-        max_lengths["V"] = max(max_lengths["V"], len(" ".join(asset_obj.create_version_obj(None).version_str)))
+        max_lengths["v"] = max(max_lengths["v"], len(" ".join(asset_obj._get_all_version_strings())))
+        max_lengths["V"] = max(max_lengths["V"], len(" ".join(asset_obj._new_version_obj(None).version_str)))
         max_lengths["P"] = max(max_lengths["P"], len(" ".join(asset_obj.list_pins())))
         max_lengths["N"] = max(max_lengths["N"], len(asset_obj.list_asset_notes().replace("\n", " - ")))
     print("\n\n")
@@ -3012,6 +3102,76 @@ def subtask_delete_pin(args,
         repo_obj.delete_pin(uri=uri,
                             pin_n=args.pin,
                             allow_delete_locked=False,
+                            log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_lock_pin(args,
+                     repo_manager_obj,
+                     localization_obj,
+                     log_str):
+    """
+    Locks a pin.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.lock_pin(uri=uri,
+                          pin_n=args.pin,
+                          log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_unlock_pin(args,
+                       repo_manager_obj,
+                       localization_obj,
+                       log_str):
+    """
+    Unlocks a pin.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.unlock_pin(uri=uri,
+                            pin_n=args.pin,
                             log_str=log_str)
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -3773,6 +3933,14 @@ def run_sub_task(args,
 
         if args.sub_task.upper() in ["DELETE-PIN", "DP"]:
             subtask_delete_pin(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["LOCK-PIN", "LP"]:
+            subtask_lock_pin(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["UNLOCK-PIN", "UP"]:
+            subtask_unlock_pin(args, repo_manager_obj, localization_obj, log_str)
             return
 
         if args.sub_task.upper() in ["PUBLISH", "P"]:
