@@ -2,8 +2,6 @@ import configparser
 import os
 import pathlib
 
-import bvzfilesystemlib
-
 from bvzversionedfiles.copydescriptor import Copydescriptor
 
 from squirrel.asset.asset import Asset
@@ -694,28 +692,6 @@ class Repo(object):
         if self.get_next_uri_paths(uri_path):
             return False
         return True
-    #
-    # # ------------------------------------------------------------------------------------------------------------------
-    # def _path_is_leaf(self,
-    #                   path_p):
-    #     """
-    #     Returns true if the given path is a leaf structure dir, False otherwise. A leaf is the very last path item in
-    #     the repo structure.
-    #
-    #     :param path_p:
-    #             The full absolute path we are testing.
-    #
-    #     :return:
-    #             True if the path is a leaf structure dir of the repo, False otherwise.
-    #     """
-    #
-    #     if not self._path_is_part_of_repo_structure(path_p):
-    #         return False
-    #
-    #     uri_path = self._uri_path_from_file_path(path_p)
-    #     if self._uri_path_is_leaf(uri_path):
-    #         return True
-    #     return False
 
     # ------------------------------------------------------------------------------------------------------------------
     def get_next_uri_paths(self,
@@ -741,35 +717,6 @@ class Repo(object):
                     output.append(item)
 
         return output
-    #
-    # # ------------------------------------------------------------------------------------------------------------------
-    # def get_next_from_broken_uri_path(self,
-    #                                   uri_path):
-    #     """
-    #     Given a uri_path that is broken (i.e. is not a valid uri_path), return the portion of the uri_path that is
-    #     valid, plus a list of possible next items.
-    #
-    #     :param uri_path:
-    #             The broken uri_path.
-    #
-    #     :return:
-    #             A tuple where the first item is the portion of the uri_path that is valid, and the second item is a list
-    #             of possible next uri_paths.
-    #     """
-    #
-    #     # If the uri_path is valid return the uri_path unchanged and a list of possible next uri_paths
-    #     if self._uri_path_is_valid(uri_path):
-    #         possible_next = self.get_next_uri_paths(uri_path)
-    #         return uri_path, possible_next
-    #
-    #     # Get just the valid portion of the uri_path - we convert to a path first because the next function will strip
-    #     # out any parts of this path that are not a valid uri_path
-    #     path_p = self._file_path_from_uri_path(uri_path)
-    #     valid_uri_path = self._uri_path_from_file_path(path_p)
-    #
-    #     possible_next = self.get_next_uri_paths(valid_uri_path)
-    #
-    #     return valid_uri_path, possible_next
 
     # ------------------------------------------------------------------------------------------------------------------
     def _bless_dir(self,
@@ -1966,6 +1913,68 @@ class Repo(object):
             asset_obj.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
+    def lock_pin(self,
+                 uri,
+                 pin_n,
+                 log_str=None):
+        """
+        Locks the pin on the given asset.
+
+        :param uri:
+                The URI of the asset.
+        :param pin_n:
+                The pin to set.
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
+
+        :return:
+                Nothing.
+        """
+
+        assert type(uri) is str
+        assert type(pin_n) is str
+        assert log_str is None or type(log_str) is str
+
+        asset_obj = self.asset_obj_from_uri(uri)
+        asset_obj.lock_pin(pin_n=pin_n)
+
+        if log_str is not None:
+            log_str += "Deleted {pin}"
+            log_str = log_str.format(pin=pin_n)
+            asset_obj.append_to_log(log_str)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def unlock_pin(self,
+                   uri,
+                   pin_n,
+                   log_str=None):
+        """
+        Unlocks the pin on the given asset.
+
+        :param uri:
+                The URI of the asset.
+        :param pin_n:
+                The pin to set.
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
+
+        :return:
+                Nothing.
+        """
+
+        assert type(uri) is str
+        assert type(pin_n) is str
+        assert log_str is None or type(log_str) is str
+
+        asset_obj = self.asset_obj_from_uri(uri)
+        asset_obj.unlock_pin(pin_n=pin_n)
+
+        if log_str is not None:
+            log_str += "Deleted {pin}"
+            log_str = log_str.format(pin=pin_n)
+            asset_obj.append_to_log(log_str)
+
+    # ------------------------------------------------------------------------------------------------------------------
     @staticmethod
     def _file_list_to_copydescriptors(items,
                                       link_in_place):
@@ -2145,64 +2154,6 @@ class Repo(object):
         asset_obj.collapse()
 
         # TODO: Have to update the cache with this newly published asset/version.
-
-    # # ------------------------------------------------------------------------------------------------------------------
-    # def add_thumbnails(self,
-    #                    version,
-    #                    thumbnail_paths,
-    #                    asset_n,
-    #                    poster_frame_num=None,
-    #                    uri_path=None,
-    #                    log_str=None):
-    #     """
-    #     Adds thumbnail files to the asset defined by the uri_path and asset name.
-    #
-    #     :param version:
-    #             The version to add the thumbnails to. If None, then the latest version will be used.
-    #     :param thumbnail_paths:
-    #             A list of thumbnail file paths.
-    #     :param asset_n:
-    #             The name of the asset.
-    #     :param poster_frame_num:
-    #             An integer that identifies which frame of the thumbnail sequence should be used as the poster frame. If
-    #             None, then the first frame of the sequence is used. Defaults to None.
-    #     :param uri_path:
-    #             The uri_path that uniquely defines the location of the asset. If None, then an attempt will be made to
-    #             find the asset by the name alone. If more than one asset has the same name, an error is raised. Defaults
-    #             to None.
-    #     :param log_str:
-    #         A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
-    #
-    #     :return:
-    #             Nothing.
-    #     """
-    #
-    #     assert version is None or type(version) is str
-    #     assert type(thumbnail_paths) is list
-    #     assert type(asset_n) is str
-    #     assert poster_frame_num is None or type(poster_frame_num) is int
-    #     assert uri_path is None or type(uri_path) is str
-    #     assert log_str is None or type(log_str) is str
-    #
-    #     for i in range(len(thumbnail_paths)):
-    #         thumbnail_paths[i] = os.path.abspath(thumbnail_paths[i])
-    #
-    #     asset_id = self.asset_id_from_uri_path_and_name(asset_n=asset_n,
-    #                                                     uri_path=uri_path)
-    #     asset_obj = self.asset_obj_from_asset_id(asset_id)
-    #
-    #     asset_obj.add_thumbnails(thumbnail_paths=thumbnail_paths,
-    #                              version=version,
-    #                              poster_p=poster_frame_num)
-    #
-    #     if log_str is not None:
-    #         if log_str is not None:
-    #             if version is None:
-    #                 version_obj = asset_obj.get_version_obj(None)
-    #                 version = version_obj.version_str
-    #         log_str += "Added thumbnails to version {version}: [{thumbnail_paths}]"
-    #         log_str = log_str.format(version=version, thumbnail_paths=", ".join(thumbnail_paths))
-    #         asset_obj.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _get_publish_path(self,
