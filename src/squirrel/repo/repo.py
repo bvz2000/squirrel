@@ -1923,7 +1923,7 @@ class Repo(object):
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.set_pin(pin_n=pin_n,
                           version_str=version,
-                          lock=False,
+                          locked=False,
                           allow_delete_locked=False)
 
         if log_str is not None:

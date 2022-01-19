@@ -114,12 +114,8 @@ class Asset(object):
         self.keywords_obj = Keywords(self.localized_resource_obj, self.asset_d)
         self.key_values_obj = KeyValuePairs(self.localized_resource_obj, self.asset_d)
 
-        if os.path.exists(self.asset_d):
-            self.versions = self._build_versions_dict()
-            self.pins = self._build_pins_dict()
-        else:
-            self.pins = dict()
-            self.versions = dict()
+        self.version_strings = self._get_all_version_strings()
+        self.version_ints = self._get_all_version_numbers()
 
         self.data_sizes = dict()
 
@@ -135,12 +131,38 @@ class Asset(object):
         return os.path.exists(os.path.join(self.asset_d, ".asset"))
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _get_all_version_numbers(self) -> list:
+    def _get_all_pins(self) -> dict:
         """
-        Returns a list of all the version numbers that exist on disk.
+        Returns a dictionary of all the pins in the asset where the key is the pin name and the value is the version
+        string the pin references.
 
         :return:
-                A list of integers that represent all of the version numbers.
+                A dictionary of all the pins in the asset. key=pin name, value=referenced version (as a string).
+        """
+
+        output = dict()
+
+        if not os.path.exists(self.asset_d):
+            return output
+
+        items = os.listdir(self.asset_d)
+        for potential_pin in items:
+            potential_pin_p = os.path.join(self.asset_d, potential_pin)
+            if os.path.islink(potential_pin_p):
+                target = os.path.split(str(Path(potential_pin_p).resolve()))[1]
+                result = re.match(pattern=VERSION_PATTERN, string=target)
+                if result:
+                    output[potential_pin] = target
+
+        return output
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _get_all_version_strings(self) -> list:
+        """
+        Returns a list of all the version strings that exist on disk.
+
+        :return:
+                A list of strings that represent all of the version numbers.
         """
 
         output = list()
@@ -153,7 +175,23 @@ class Asset(object):
             if os.path.isdir(os.path.join(self.asset_d, item)):
                 result = re.match(pattern=VERSION_PATTERN, string=str(item))
                 if result is not None:
-                    output.append(int(result.groups()[1]))
+                    output.append(item)
+
+        return output
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _get_all_version_numbers(self) -> list:
+        """
+        Returns a list of all the version numbers that exist on disk.
+
+        :return:
+                A list of integers that represent all of the version numbers.
+        """
+
+        output = list()
+
+        for version_str in self.version_strings:
+            output.append(self._version_int_from_str(version_str=version_str))
 
         return output
 
@@ -166,11 +204,10 @@ class Asset(object):
                The highest version dir in the asset as an int. If the asset does not have any versions yet, returns 0.
         """
 
-        versions = self._get_all_version_numbers()
-        if not versions:
+        if not self.version_ints:
             return 0
 
-        return max(versions)
+        return max(self.version_ints)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _get_next_available_ver_num(self) -> int:
@@ -182,8 +219,8 @@ class Asset(object):
         """
 
         highest = self._get_highest_ver_num()
-        next_available = highest + 1
-        return next_available
+
+        return highest + 1
 
     # ------------------------------------------------------------------------------------------------------------------
     @staticmethod
@@ -198,35 +235,22 @@ class Asset(object):
         return "v{version}".format(version=str(version_int).rjust(VERSION_NUM_DIGITS, "0"))
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _version_obj_from_version_str(self,
-                                      version_str=None) -> Version:
+    def _version_int_from_str(self,
+                              version_str) -> int:
         """
-        Given a version string, return the associated version object. If version_str is None, then return the highest
-        possible version object.
+        Given a version as a string, return an integer.
 
         :param version_str:
-                The version string of the version to return. If None, then return the highest possible version object.
-                Defaults to None.
-
-        :return:
-                A version object.
+                The version number as a string.
         """
 
-        if version_str is None:
-            version_str = self._get_highest_ver_num()
-            version_str = self._version_str_from_int(version_str)
+        result = re.match(pattern=VERSION_PATTERN, string=str(version_str))
+        if result is not None:
+            return int(result.groups()[1])
 
-        if not self._version_exists(version=version_str):
-            err_msg = self.localized_resource_obj.get_error_msg(11000)
-            err_msg = err_msg.format(version=version_str)
-            raise SquirrelError(err_msg, 11000)
-
-        if version_str not in self.versions.keys():
-            err_msg = self.localized_resource_obj.get_error_msg(11000)
-            err_msg = err_msg.format(version=version_str)
-            raise SquirrelError(err_msg, 11000)
-
-        return self.versions[version_str]
+        err_msg = self.localized_resource_obj.get_error_msg(11009)
+        err_msg = err_msg.format(version=version_str)
+        raise SquirrelError(err_msg, 11009)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _version_exists(self,
@@ -242,43 +266,66 @@ class Asset(object):
         """
 
         if type(version) is str:
-            result = re.match(VERSION_PATTERN, version)
-            if result:
-                version = int(result.groups()[1])
+            version = self._version_int_from_str(version)
 
-        return version in self._get_all_version_numbers()
+        return version in self.version_ints
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _version_str_from_pin(self,
+                              pin_n):
+        """
+        Given a pin, return the string of the version that this pin references. Assumes that the pin_n is a valid pin.
+
+        :param pin_n:
+                The name of the pin from which we want to extract the version string.
+        """
+
+        pin_p = os.path.join(self.asset_d, pin_n)
+
+        return os.path.split(str(Path(pin_p).resolve()))[1]
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _pins_from_version_str(self,
+                               version_str):
+        """
+        Given a version string, return a list of pins that reference this version.
+
+        :param version_str:
+                The version string.
+
+        :return:
+                A list of pins that reference the version. If no pins reference the version, an empty list is returned.
+        """
+
+        output = list()
+
+        pins_n = self._get_all_pins()
+        for pin_n in pins_n:
+            pin_version_str = self._version_str_from_pin(pin_n)
+            if pin_version_str == version_str:
+                output.append(pin_n)
+
+        return output
 
     # ------------------------------------------------------------------------------------------------------------------
     def _pin_exists(self,
-                    pin) -> bool:
+                    pin_n) -> bool:
         """
         Given a pin, return whether this pin actually exists or not.
 
-        :param pin:
+        :param pin_n:
                 The pin.
 
         :return:
                 True if the pin exists. False otherwise.
         """
 
-        if not os.path.exists(self.asset_d):
-            return False
-
-        items = os.listdir(self.asset_d)
-        for item in items:
-            if item == pin:
-                test_p = os.path.join(self.asset_d, item)
-                if os.path.islink(test_p):
-                    target = os.path.split(str(Path(test_p).resolve()))[1]
-                    result = re.match(pattern=VERSION_PATTERN, string=target)
-                    if result:
-                        return True
-        return False
+        return pin_n in self._get_all_pins()
 
     # ------------------------------------------------------------------------------------------------------------------
-    def create_version_obj(self,
-                           version_str=None,
-                           version_must_exist=True) -> Version:
+    def _new_version_obj(self,
+                         version_str=None,
+                         version_must_exist=True) -> Version:
         """
         Given a version string, returns a version object. If the version_str is None, then the highest existing version
         number will be used.
@@ -311,50 +358,34 @@ class Asset(object):
                        localized_resource_obj=self.localized_resource_obj)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _build_versions_dict(self) -> dict:
+    def _new_pin_obj(self,
+                     pin_n,
+                     pin_must_exist,
+                     version_str=None):
         """
-        Returns a dictionary of all of the versions where the key is the version string and the value is a version
-        object.
+        Given a pin name, create a pin object.
+
+        :param pin_n:
+                The name of the pin.
+        :param pin_must_exist:
+                If True, then the pin must exist on disk or an error will be raised.
+        :param version_str:
+                The version string this pin will reference. Only needed when creating a new pin that does not already
+                exist on disk. Ignored otherwise (set to None by default for convenience).
 
         :return:
-                A dictionary of version objects.
+                A pin object.
         """
 
-        output = dict()
+        if not self._pin_exists(pin_n) and pin_must_exist:
+            err_msg = self.localized_resource_obj.get_error_msg(11002)
+            err_msg = err_msg.format(pin=pin_n)
+            raise SquirrelError(err_msg, 11002)
 
-        version_ints = self._get_all_version_numbers()
-        for version_int in version_ints:
-            version_str = self._version_str_from_int(version_int)
-            version_obj = self.create_version_obj(version_str)
-            output[version_obj.version_str] = version_obj
-
-        return output
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _build_pins_dict(self) -> dict:
-        """
-        Builds a dictionary of all the pins.
-
-        :return:
-                A dictionary where the key is the pin name and the value is a pin object.
-        """
-
-        output = dict()
-        items = os.listdir(self.asset_d)
-        for item in items:
-            test_p = os.path.join(self.asset_d, item)
-            if (os.path.islink(test_p)) and item[0] != ".":
-                version_str = os.readlink(test_p).lstrip(".").strip("/")
-                default_pin_name = self.config_obj.get_string("asset_settings", "default_pin_name").upper()
-                is_default = default_pin_name == item
-                output[item] = Pin(pin_n=item,
-                                   asset_d=self.asset_d,
-                                   version_obj=self.versions[version_str],
-                                   is_locked=is_default,
-                                   localized_resource_obj=self.localized_resource_obj,
-                                   config_obj=self.config_obj)
-
-        return output
+        return Pin(pin_n=pin_n,
+                   asset_d=self.asset_d,
+                   version_str=version_str,
+                   localized_resource_obj=self.localized_resource_obj)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _create_asset_directory(self):
@@ -489,12 +520,13 @@ class Asset(object):
 
         current_version_int = self._get_highest_ver_num()
         current_version_str = self._version_str_from_int(version_int=current_version_int)
-        current_version_obj = self.versions[current_version_str]
+        current_version_obj = self._new_version_obj(version_str=current_version_str,
+                                                    version_must_exist=True)  # self.versions[current_version_str]
 
         new_version_num = self._get_next_available_ver_num()
         new_version_str = self._version_str_from_int(new_version_num)
-        new_version_obj = self.create_version_obj(version_str=new_version_str,
-                                                  version_must_exist=False)
+        new_version_obj = self._new_version_obj(version_str=new_version_str,
+                                                version_must_exist=False)
 
         shutil.copytree(src=current_version_obj.version_d,
                         dst=new_version_obj.version_d,
@@ -535,8 +567,8 @@ class Asset(object):
         else:
             new_version_num = self._get_next_available_ver_num()
             new_version_str = self._version_str_from_int(new_version_num)
-            version_obj = self.create_version_obj(version_str=new_version_str,
-                                                  version_must_exist=False)
+            version_obj = self._new_version_obj(version_str=new_version_str,
+                                                version_must_exist=False)
             version_obj.create_dirs()
 
         return version_obj
@@ -568,7 +600,7 @@ class Asset(object):
         assert type(verify_copy) == bool
 
         version_obj = self._create_version(merge)
-        self.versions[version_obj.version_str] = version_obj
+        # self.versions[version_obj.version_str] = version_obj
 
         bvzversionedfiles.copy_files_deduplicated(
             copydescriptors=copydescriptors,
@@ -581,13 +613,52 @@ class Asset(object):
         # Create the default pin (if the config is set up to do that)
         if self.config_obj.get_boolean("asset_settings", "auto_create_default_pin"):
             pin_name = self.config_obj.get_string("asset_settings", "default_pin_name").upper()
-            pin_obj = self.set_pin(pin_n=pin_name,
-                                   version_str=version_obj.version_str,
-                                   lock=True,
-                                   allow_delete_locked=True)
-            self.pins[pin_obj.pin_n] = pin_obj
+            self.set_pin(pin_n=pin_name,
+                         version_str=version_obj.version_str,
+                         locked=True,
+                         allow_delete_locked=True)
 
         return version_obj
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def delete_version(self,
+                       version_str):
+        """
+        Deletes the version given by version_str.
+
+        :param version_str:
+                The string that identifies the version.
+
+        :return:
+                Nothing.
+        """
+
+        pins = self._pins_from_version_str(version_str)
+        if pins:
+            err_msg = self.localized_resource_obj.get_error_msg(13001)
+            err_msg = err_msg.format(version=version_str)
+            raise SquirrelError(err_msg, 13001)
+
+        if version_str not in self.version_strings:
+            err_msg = self.localized_resource_obj.get_error_msg(11000)
+            err_msg = err_msg.format(version=version_str)
+            raise SquirrelError(err_msg, 11000)
+
+        version_strings = self.version_strings.copy()  # We will be modifying this list, so make a copy
+        version_strings.remove(version_str)  # Remove the version to be deleted. We don't want to keep these files.
+        files_to_keep = list()
+        for version_to_keep_str in version_strings:
+            version_obj = self._new_version_obj(version_str=version_to_keep_str,
+                                                version_must_exist=True)
+            files_to_keep.extend(version_obj.user_data_files())
+
+        version_obj = self._new_version_obj(version_str=version_str,
+                                            version_must_exist=True)
+        version_obj.delete_version(files_to_keep=files_to_keep)
+
+        # Update the list of versions
+        self.version_strings.remove(version_str)
+        self.version_ints.remove(self._version_int_from_str(version_str))
 
     # ------------------------------------------------------------------------------------------------------------------
     def collapse(self):
@@ -600,20 +671,19 @@ class Asset(object):
         :return: Nothing.
         """
 
-        latest_version_obj = self.create_version_obj(None)
-        all_version_objs = list(self.versions.values())
+        latest_version_int = self._get_highest_ver_num()
+        all_version_ints = self.version_ints.copy()  # We will be modifying this list of versions
+        all_version_ints.remove(latest_version_int)
 
-        for version_obj in self.versions.values():
-            if version_obj.version_int != latest_version_obj.version_int:
-                version_obj.delete_version(all_version_objs=all_version_objs,
-                                           pins=self.pins)
-                all_version_objs.remove(version_obj)
+        for version_int in all_version_ints:
+            version_str = self._version_str_from_int(version_int)
+            self.delete_version(version_str=version_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def set_pin(self,
                 pin_n,
                 version_str,
-                lock,
+                locked,
                 allow_delete_locked):
         """
         Sets a pin for the current asset with the name "name" to the version given by "version".
@@ -622,7 +692,7 @@ class Asset(object):
                 The name of the pin to be set.
         :param version_str:
                 The version string of the version to set the pin to.
-        :param lock:
+        :param locked:
                 If True, then the pin will be locked and cannot be deleted or changed by the user.
         :param allow_delete_locked:
                 If True, then if there is a previous version of this pin, it will first be deleted regardless of locked
@@ -630,24 +700,17 @@ class Asset(object):
                 raised.
 
         :return:
-                The pin object.
+                Nothing.
         """
 
         assert type(pin_n) is str
         assert type(version_str) is str
 
-        version_obj = self._version_obj_from_version_str(version_str)
-
-        pin_obj = Pin(pin_n=pin_n,
-                      asset_d=self.asset_d,
-                      version_obj=version_obj,
-                      is_locked=lock,
-                      localized_resource_obj=self.localized_resource_obj,
-                      config_obj=self.config_obj)
-
-        pin_obj.create_link(allow_delete_locked)
-
-        return pin_obj
+        pin_obj = self._new_pin_obj(pin_n=pin_n,
+                                    pin_must_exist=False,
+                                    version_str=version_str)
+        pin_obj.create_link(allow_delete_locked=allow_delete_locked,
+                            lock=locked)
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_pin(self,
@@ -670,43 +733,26 @@ class Asset(object):
         assert type(pin_n) is str
 
         pin_n = pin_n.upper()
-        if pin_n not in self.pins.keys():
+        if not self._pin_exists(pin_n):
             err_msg = self.localized_resource_obj.get_error_msg(1234)
             err_msg = err_msg.format(pin_n=pin_n)
             raise SquirrelError(err_msg, 1234)
 
-        self.pins[pin_n].delete_link(allow_delete_locked)
-        del self.pins[pin_n]
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def list_versions(self):
-        """
-        Returns a list of all the versions (as strings).
-
-        :return:
-                A list of all versions as strings.
-        """
-
-        output = list()
-
-        version_objs = self.versions.values()
-        for version_obj in version_objs:
-            output.append(version_obj.version_str)
-
-        return output
+        pin_obj = self._new_pin_obj(pin_n=pin_n,
+                                    pin_must_exist=True,
+                                    version_str=None)
+        pin_obj.delete_link(allow_delete_locked)
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_pins(self):
         """
-        Returns a list of all the pins.
+        Returns a list of all the pins. Just a wrapper for _get_all_pins().
 
         :return:
                 A list of all pins.
         """
 
-        pins = self._build_pins_dict()
-
-        return list(pins.keys())
+        return self._get_all_pins()
 
     # ------------------------------------------------------------------------------------------------------------------
     def add_thumbnails(self,
@@ -731,7 +777,9 @@ class Asset(object):
                 Nothing.
         """
 
-        version_obj = self._version_obj_from_version_str(version_str=version_str)
+        # version_obj = self._version_obj_from_version_str(version_str=version_str)
+        version_obj = self._new_version_obj(version_str=version_str,
+                                            version_must_exist=True)
         version_obj.add_thumbnails(thumbnails_p=thumbnails_p,
                                    poster_p=poster_p)
 
@@ -749,7 +797,9 @@ class Asset(object):
                 Nothing.
         """
 
-        version_obj = self._version_obj_from_version_str(version_str=version_str)
+        # version_obj = self._version_obj_from_version_str(version_str=version_str)
+        version_obj = self._new_version_obj(version_str=version_str,
+                                            version_must_exist=True)
         version_obj.delete_thumbnails(all_version_objs=list(self.versions.values()))
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -765,8 +815,9 @@ class Asset(object):
                 A list of thumbnails (including full paths).
         """
 
-        version_obj = self._version_obj_from_version_str(version_str=version_str)
-
+        # version_obj = self._version_obj_from_version_str(version_str=version_str)
+        version_obj = self._new_version_obj(version_str=version_str,
+                                            version_must_exist=True)
         return version_obj.thumbnail_symlink_files()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -782,8 +833,9 @@ class Asset(object):
                 A path to the thumbnail poster file.
         """
 
-        version_obj = self._version_obj_from_version_str(version_str=version_str)
-
+        # version_obj = self._version_obj_from_version_str(version_str=version_str)
+        version_obj = self._new_version_obj(version_str=version_str,
+                                            version_must_exist=True)
         return version_obj.thumbnail_poster_file()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -906,7 +958,7 @@ class Asset(object):
         assert type(overwrite) is bool
         assert version is None or type(version) is str or type(version) is int
 
-        version_obj = self.create_version_obj(version)
+        version_obj = self._new_version_obj(version)
         version_obj.add_notes(notes=notes,
                               overwrite=overwrite)
 
@@ -926,7 +978,7 @@ class Asset(object):
 
         assert version is None or type(version) is str or type(version) is int
 
-        version_obj = self.create_version_obj(version)
+        version_obj = self._new_version_obj(version)
         version_obj.delete_notes()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -945,7 +997,7 @@ class Asset(object):
 
         assert version is None or type(version) is str or type(version) is int
 
-        version_obj = self.create_version_obj(version)
+        version_obj = self._new_version_obj(version)
         return version_obj.list_notes()
 
     # ------------------------------------------------------------------------------------------------------------------
