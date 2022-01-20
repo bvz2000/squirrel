@@ -2,6 +2,7 @@ import configparser
 import os
 import pathlib
 
+import bvzversionedfiles.bvzversionedfiles as bvzversionedfiles
 from bvzversionedfiles.copydescriptor import Copydescriptor
 
 from squirrel.asset.asset import Asset
@@ -1364,7 +1365,8 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def add_keywords(self,
                      uri,
-                     keywords):
+                     keywords,
+                     log_str=None):
         """
         Given a URI that uniquely identifies an asset, adds the list of keywords to that asset.
 
@@ -1372,6 +1374,8 @@ class Repo(object):
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
         :param keywords:
                 A list of keywords to add. Keywords are case-insensitive.
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1386,7 +1390,8 @@ class Repo(object):
             raise SquirrelError(err_msg, 201)
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.add_keywords(keywords)
+        asset_obj.add_keywords(keywords=keywords,
+                               log_str=log_str)
 
         # Get the full list of keywords (not just the ones being added) from the asset.
         keywords = asset_obj.list_keywords()
@@ -1399,7 +1404,8 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def delete_keywords(self,
                         uri,
-                        keywords):
+                        keywords,
+                        log_str=None):
         """
         Given a URI that uniquely identifies an asset, deletes any keywords in the list of keywords given.
 
@@ -1407,6 +1413,9 @@ class Repo(object):
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
         :param keywords:
                 A list of keywords to delete. Keywords are case-insensitive.
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
+
 
         :return:
                 Nothing.
@@ -1421,7 +1430,8 @@ class Repo(object):
             raise SquirrelError(err_msg, 201)
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.delete_keywords(keywords)
+        asset_obj.delete_keywords(keywords=keywords,
+                                  log_str=log_str)
 
         # Get the full list of keywords (not just the ones being added) from the asset.
         keywords = asset_obj.list_keywords()
@@ -1433,12 +1443,15 @@ class Repo(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_all_keywords(self,
-                            uri):
+                            uri,
+                            log_str=None):
         """
         Given a URI that uniquely identifies an asset, deletes all keywords from that asset.
 
         :param uri:
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1454,7 +1467,8 @@ class Repo(object):
         asset_obj = self.asset_obj_from_uri(uri)
 
         keywords = asset_obj.list_keywords()
-        asset_obj.delete_keywords(keywords)
+        asset_obj.delete_keywords(keywords=keywords,
+                                  log_str=log_str)
 
         asset_id = self._asset_id_from_uri(uri)
         self._flush_asset_keywords_from_cache(asset_id)
@@ -1501,7 +1515,8 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def add_metadata(self,
                      uri,
-                     metadata):
+                     metadata,
+                     log_str=None):
         """
         Given a URI that uniquely identifies an asset, adds the list of metadata key value pairs to that asset.
 
@@ -1509,6 +1524,8 @@ class Repo(object):
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
         :param metadata:
                 A list of metadata key=value pairs to add. Metadata (both keys and values) is case-insensitive.
+       :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1540,7 +1557,8 @@ class Repo(object):
             key_value_pairs[key] = value
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.add_key_value_pairs(key_value_pairs=key_value_pairs)
+        asset_obj.add_key_value_pairs(key_value_pairs=key_value_pairs,
+                                      log_str=log_str)
 
         # Get the full list of metadata (not just the ones being added) from the asset.
         key_value_pairs = asset_obj.list_key_value_pairs()
@@ -1553,7 +1571,8 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def delete_metadata(self,
                         uri,
-                        metadata_keys):
+                        metadata_keys,
+                        log_str=None):
         """
         Given a URI that uniquely identifies an asset, deletes any metadata in the list of metadata keys given.
 
@@ -1561,6 +1580,8 @@ class Repo(object):
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
         :param metadata_keys:
                 A list of metadata keys to delete. Keys are case-insensitive.
+       :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1573,13 +1594,15 @@ class Repo(object):
         assert type(uri) is str
         assert type(metadata_keys) is list
 
+        # TODO: Should the following check be on all of the user called functions?
         if not urilib.validate_uri_format(uri):
             err_msg = self.localized_resource_obj.get_error_msg(201)
             err_msg = err_msg.format(uri=uri)
             raise SquirrelError(err_msg, 201)
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.delete_key_value_pairs(keys=metadata_keys)
+        asset_obj.delete_key_value_pairs(keys=metadata_keys,
+                                         log_str=log_str)
 
         # Get the full list of metadata key value pairs (not just the ones being deleted) from the asset.
         key_value_pairs = asset_obj.list_key_value_pairs()
@@ -1591,12 +1614,15 @@ class Repo(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_all_metadata(self,
-                            uri):
+                            uri,
+                            log_str=None):
         """
         Given a URI that uniquely identifies an asset, deletes all metadata from the asset.
 
         :param uri:
                 The full URI that identifies the asset (repo_name://uri_path#asset_name)
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1611,7 +1637,8 @@ class Repo(object):
 
         asset_obj = self.asset_obj_from_uri(uri)
         keys = list(asset_obj.list_key_value_pairs().keys())
-        asset_obj.delete_key_value_pairs(keys=keys)
+        asset_obj.delete_key_value_pairs(keys=keys,
+                                         log_str=log_str)
 
         asset_id = self._asset_id_from_uri(uri)
         self._flush_asset_metadata_from_cache(asset_id)
@@ -1676,12 +1703,8 @@ class Repo(object):
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.add_version_notes(version=version,
                                     notes=notes,
-                                    overwrite=overwrite)
-
-        # TODO: Move logging into the asset
-        if log_str is not None:
-            log_str += "Added notes to version {version}: [{notes}]".format(version=version, notes=notes)
-            asset_obj.append_to_log(log_str)
+                                    overwrite=overwrite,
+                                    log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_version_notes(self,
@@ -1706,12 +1729,8 @@ class Repo(object):
         assert type(uri) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.delete_version_notes(version=version)
-
-        # TODO: Move logging into the asset
-        if log_str is not None:
-            log_str += "Deleted all version-level notes from version: {version}".format(version=version)
-            asset_obj.append_to_log(log_str)
+        asset_obj.delete_version_notes(version=version,
+                                       log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_asset_notes(self,
@@ -1762,12 +1781,8 @@ class Repo(object):
 
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.add_asset_notes(notes=notes,
-                                  overwrite=overwrite)
-
-        # TODO: Move logging into the asset
-        if log_str is not None:
-            log_str += "Added notes: [{notes}]".format(notes=notes)
-            asset_obj.append_to_log(log_str)
+                                  overwrite=overwrite,
+                                  log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_asset_notes(self,
@@ -1788,12 +1803,7 @@ class Repo(object):
         assert type(uri) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.delete_asset_notes()
-
-        # TODO: Move logging into the asset
-        if log_str is not None:
-            log_str += "Deleted all asset-level notes"
-            asset_obj.append_to_log(log_str)
+        asset_obj.delete_asset_notes(log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def add_thumbnails(self,
@@ -1803,7 +1813,7 @@ class Repo(object):
                        version=None,
                        log_str=None):
         """
-        Adds notes to the asset defined by the URI and version. Notes are stored on the version level.
+        Adds thumbnails to the asset defined by the URI and version.
 
         :param uri:
                 The asset URI.
@@ -1830,15 +1840,36 @@ class Repo(object):
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.add_thumbnails(thumbnails_p=thumbnails_p,
                                  poster_p=poster_p,
-                                 version_str=version)
+                                 version_str=version,
+                                 log_str=log_str)
 
-        # TODO: Move logging into the asset
-        if log_str is not None:
-            fs = Framespec()
-            fs.files = thumbnails_p
-            log_str += "Added thumbnails to version {version}: {thumbnails}".format(version=version,
-                                                                                    thumbnails=fs.framespec_str)
-            asset_obj.append_to_log(log_str)
+    # ------------------------------------------------------------------------------------------------------------------
+    def delete_thumbnails(self,
+                          uri,
+                          version=None,
+                          log_str=None):
+        """
+        Deletes thumbnails from the asset defined by the URI and version.
+
+        :param uri:
+                The asset URI.
+        :param version:
+                The version or pin to which the thumbnails should be added. If None, then the latest version will be
+                used. Defaults to None.
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
+
+        :return:
+                Nothing.
+        """
+
+        assert type(uri) is str
+        assert version is None or type(version) is str
+        assert log_str is None or type(log_str) is str
+
+        asset_obj = self.asset_obj_from_uri(uri)
+        asset_obj.delete_thumbnails(version_str=version,
+                                    log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def set_pin(self,
@@ -1871,12 +1902,8 @@ class Repo(object):
         asset_obj.set_pin(pin_n=pin_n,
                           version_str=version,
                           locked=False,
-                          allow_delete_locked=False)
-
-        if log_str is not None:
-            log_str += "Set {pin} pin to point to version {version}"
-            log_str = log_str.format(version=version, pin=pin_n)
-            asset_obj.append_to_log(log_str)
+                          allow_delete_locked=False,
+                          log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_pin(self,
@@ -1905,12 +1932,9 @@ class Repo(object):
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.delete_pin(pin_n=pin_n, allow_delete_locked=allow_delete_locked)
-
-        if log_str is not None:
-            log_str += "Deleted {pin}"
-            log_str = log_str.format(pin=pin_n)
-            asset_obj.append_to_log(log_str)
+        asset_obj.delete_pin(pin_n=pin_n,
+                             allow_delete_locked=allow_delete_locked,
+                             log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def lock_pin(self,
@@ -1936,12 +1960,8 @@ class Repo(object):
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.lock_pin(pin_n=pin_n)
-
-        if log_str is not None:
-            log_str += "Deleted {pin}"
-            log_str = log_str.format(pin=pin_n)
-            asset_obj.append_to_log(log_str)
+        asset_obj.lock_pin(pin_n=pin_n,
+                           log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def unlock_pin(self,
@@ -1967,73 +1987,8 @@ class Repo(object):
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.unlock_pin(pin_n=pin_n)
-
-        if log_str is not None:
-            log_str += "Deleted {pin}"
-            log_str = log_str.format(pin=pin_n)
-            asset_obj.append_to_log(log_str)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def _file_list_to_copydescriptors(items,
-                                      link_in_place):
-        """
-        Given a list of files, return a list of copydescriptors.
-
-        :param items:
-                A list of files.
-        :param link_in_place:
-                If True, then each file will be set to link in place.
-
-        :return:
-                A list of copydescriptor objects.
-        """
-
-        copydescriptors = list()
-
-        for item in items:
-            try:
-                copydescriptor = Copydescriptor(source_p=item,
-                                                dest_relative_p=os.path.split(item)[1],
-                                                link_in_place=link_in_place)
-                copydescriptors.append(copydescriptor)
-            except ValueError as e:
-                raise SquirrelError(str(e), 5001)
-
-        return copydescriptors
-
-    # ------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def _directory_to_copydescriptors(dir_d,
-                                      link_in_place):
-        """
-        Given a directory, return a list of copydescriptors.
-
-        :param dir_d:
-                A directory, all children of which will be converted to copydescriptors.
-        :param link_in_place:
-                If True, then each file will be set to link in place.
-
-        :return:
-                A list of copydescriptor objects.
-        """
-
-        copydescriptors = list()
-
-        for path, currentDirectory, files_n in os.walk(dir_d):
-            for file_n in files_n:
-                source_p = os.path.join(path, file_n)
-                dest_relative_p = source_p.split(dir_d)[1]
-                try:
-                    copydescriptor = Copydescriptor(source_p=source_p,
-                                                    dest_relative_p=dest_relative_p,
-                                                    link_in_place=link_in_place)
-                except ValueError as e:
-                    raise SquirrelError(str(e), 5000)
-                copydescriptors.append(copydescriptor)
-
-        return copydescriptors
+        asset_obj.unlock_pin(pin_n=pin_n,
+                             log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _is_file_list(self,
@@ -2080,7 +2035,8 @@ class Repo(object):
                 items,
                 merge,
                 do_verified_copy,
-                link_in_place=False):
+                link_in_place=False,
+                log_str=None):
         """
         Publishes a set of files or directory to an asset.
 
@@ -2097,6 +2053,8 @@ class Repo(object):
         :param link_in_place:
                 If True, then the files will not be copied, but instead symlinks to the original files will be published
                 instead. Defaults to False.
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -2106,11 +2064,12 @@ class Repo(object):
         assert type(items) is list
 
         if self._is_file_list(items):
-            copydescriptors = self._file_list_to_copydescriptors(items=items,
-                                                                 link_in_place=link_in_place)
+            copydescriptors = bvzversionedfiles.file_list_to_copydescriptors(items=items,
+                                                                             relative_d=None,
+                                                                             link_in_place=link_in_place)
         else:
-            copydescriptors = self._directory_to_copydescriptors(dir_d=items[0],
-                                                                 link_in_place=link_in_place)
+            copydescriptors = bvzversionedfiles.directory_to_copydescriptors(dir_d=items[0],
+                                                                             link_in_place=link_in_place)
 
         uri_path = uri.split(":/")[1].split("#")[0]
         asset_n = uri.split(":/")[1].split("#")[1]
@@ -2123,18 +2082,22 @@ class Repo(object):
 
         asset_obj.store(copydescriptors=copydescriptors,
                         merge=merge,
-                        verify_copy=do_verified_copy)
+                        verify_copy=do_verified_copy,
+                        log_str=log_str)
 
         # TODO: Have to update the cache with this newly published asset/version.
 
     # ------------------------------------------------------------------------------------------------------------------
     def collapse(self,
-                 uri):
+                 uri,
+                 log_str=None):
         """
         Removes all versions from an asset except the latest version.
 
         :param uri:
                 The URI of the asset.
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -2151,7 +2114,7 @@ class Repo(object):
                           config_obj=self.config_obj,
                           localized_resource_obj=self.localized_resource_obj)
 
-        asset_obj.collapse()
+        asset_obj.collapse(log_str=log_str)
 
         # TODO: Have to update the cache with this newly published asset/version.
 
