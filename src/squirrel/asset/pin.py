@@ -44,7 +44,7 @@ class Pin(object):
 
         self.pin_p = os.path.join(asset_d, pin_n)
         self.attr_pin_p = os.path.join(asset_d, "." + pin_n)
-        self.locked_semaphore_p = os.path.join(asset_d, f".{pin_n}_locked")
+        self.locked_semaphore_p = os.path.join(asset_d, f".{pin_n.upper()}_locked")
 
         self.version_str = version_str
 
