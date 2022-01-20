@@ -3,7 +3,7 @@ import pathlib
 import re
 from typing import Union
 
-import bvzversionedfiles
+import bvzversionedfiles.bvzversionedfiles as bvzversionedfiles
 from squirrel.shared.squirrelerror import SquirrelError
 
 
@@ -94,14 +94,14 @@ class Thumbnails(object):
             result = re.match(pattern, thumbnail_n)
 
             if result is None:
-                err_msg = self.localized_resource_obj.get_error_msg(1106)
+                err_msg = self.localized_resource_obj.get_error_msg(11006)
                 err_msg = err_msg.format(thumbnail_file=thumbnail_n, basename=self.asset_n)
-                raise SquirrelError(err_msg, 1106)
+                raise SquirrelError(err_msg, 11006)
 
             if result.groups()[0] != self.asset_n:
-                err_msg = self.localized_resource_obj.get_error_msg(1106)
+                err_msg = self.localized_resource_obj.get_error_msg(11006)
                 err_msg = err_msg.format(thumbnail_file=thumbnail_n, basename=self.asset_n)
-                raise SquirrelError(err_msg, 1106)
+                raise SquirrelError(err_msg, 11006)
 
             frame_numbers.append(int(result.groups()[1]))
 
@@ -127,23 +127,30 @@ class Thumbnails(object):
 
         ext = os.path.splitext(poster_p)[1]
 
-        bvzversionedfiles.copy_files_deduplicated(
-            sources_p=poster_p,
-            dest_d=self.thumbnail_d,
-            dest_n="poster" + ext,
-            data_d=self.thumbnail_data_d,
-            ver_prefix="sqv",
-            num_digits=4,
-            do_verified_copy=False)
+        try:
+            copydescriptors = bvzversionedfiles.single_file_to_copydescriptors(file_p=poster_p,
+                                                                               relative_d="",
+                                                                               dest_n="poster" + ext,
+                                                                               link_in_place=False)
+        except ValueError as e:
+            err_msg = self.localized_resource_obj.get_error_msg(50002)
+            raise SquirrelError(f"{err_msg}: {str(e)}", 50002)
+
+        bvzversionedfiles.copy_files_deduplicated(copydescriptors=copydescriptors,
+                                                  dest_d=self.thumbnail_d,
+                                                  data_d=self.thumbnail_data_d,
+                                                  ver_prefix="sqv",
+                                                  num_digits=4,
+                                                  do_verified_copy=False)
 
     # ------------------------------------------------------------------------------------------------------------------
     def add_thumbnails(self,
                        thumbnail_paths,
                        poster_p=None):
         """
-        Adds thumbnail images. If version is None, then the thumbnails will be set on the latest version. If
-        poster_frame is not None, then the poster_frame will be set to that frame number. Otherwise it will be set to
-        the first frame. Thumbnails are stored using the same deduplication method as regular asset files.
+        Adds thumbnail images. If poster_p is not None, then the poster_frame will be set to that file. If it is None,
+        the poster frame will be set to the first frame. Thumbnails are stored using the same deduplication method as
+        regular asset files.
 
         :param thumbnail_paths:
                 The list of thumbnail files to add.
@@ -161,26 +168,31 @@ class Thumbnails(object):
         self._verify_thumbnail_paths(thumbnail_paths=thumbnail_paths)
         self._verify_thumbnail_names(thumbnail_paths=thumbnail_paths)
 
-        bvzversionedfiles.copy_files_deduplicated(
-            sources_p=thumbnail_paths,
-            dest_d=self.thumbnail_d,
-            dest_n=None,
-            data_d=self.thumbnail_data_d,
-            ver_prefix="sqv",
-            num_digits=4,
-            do_verified_copy=False)
+        try:
+            copydescriptors = bvzversionedfiles.file_list_to_copydescriptors(items=thumbnail_paths,
+                                                                             relative_d=None,
+                                                                             link_in_place=False)
+        except ValueError as e:
+            err_msg = self.localized_resource_obj.get_error_msg(50001)
+            raise SquirrelError(f"{err_msg}: {str(e)}", 50001)
+
+        bvzversionedfiles.copy_files_deduplicated(copydescriptors=copydescriptors,
+                                                  dest_d=self.thumbnail_d,
+                                                  data_d=self.thumbnail_data_d,
+                                                  ver_prefix="sqv",
+                                                  num_digits=4,
+                                                  do_verified_copy=False)
 
         self.set_poster_frame(poster_p=poster_p)
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_thumbnails(self,
-                          all_version_objs):
+                          files_to_keep):
         """
         Deletes the thumbnails and poster frame.
 
-        :param all_version_objs:
-                A list of all version objects. Necessary so that we don't remove any thumbnails files that may be
-                referenced in another version.
+        :param files_to_keep:
+                A list of files NOT to delete.
 
         :return:
                 Nothing.
@@ -188,19 +200,13 @@ class Thumbnails(object):
 
         target_files_to_delete = self.version_obj.thumbnail_data_files()
 
-        target_files_to_keep = list()
-        for version_obj in all_version_objs:
-            if version_obj.version_int != self.version_obj.version_int:
-                target_files_to_keep.extend(version_obj.user_data_files())
-        target_files_to_keep = list(set(target_files_to_keep))
-
         for delete_target in target_files_to_delete:
-            if delete_target not in target_files_to_keep:
+            if delete_target not in files_to_keep:
                 os.remove(delete_target)
 
         symlink_files_to_delete = self.version_obj.user_thumbnail_symlink_files()
         for symlink_file_to_delete in symlink_files_to_delete:
-            os.remove(symlink_file_to_delete)
+            os.unlink(symlink_file_to_delete)
 
     # ------------------------------------------------------------------------------------------------------------------
     def thumbnail_symlink_files(self) -> list:
