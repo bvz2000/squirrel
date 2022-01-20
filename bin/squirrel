@@ -113,12 +113,13 @@ def initial_parser_setup(localization_obj):
             The parsed args.
     """
 
-    # TODO: Add the following functions:
-    #  add thumbnails,
-    #  list thumbnails,
-    #  delete thumbnails,
-    #  list asset disk space usage,
-    #  delete asset version
+    # TODO: Add or fix the following functions:
+    #  fix: add thumbnails,
+    #  fix: list thumbnails,
+    #  fix: delete thumbnails,
+    #  add: list asset disk space usage,
+    #  add: delete asset version
+    #  add: quick publish (no need for a uri because the full uri is embedded in the name (minus the repo)
     #  add log,
     #  display log
 
@@ -448,17 +449,6 @@ def initial_parser_setup(localization_obj):
     #                                               formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
     #                                               help=help_str)
     # setup_delete_version_parser(sub_parser=delete_version_parser,
-    #                             localization_obj=localization_obj,
-    #                             name_required=asset_name_required,
-    #                             asset_parent_path_required=asset_parent_path_required)
-    #
-    # # collapse-asset
-    # help_str = localization_obj.get_msg("collapse_asset_help")
-    # collapse_asset_parser = sub_parser.add_parser(name="collapse-asset",
-    #                                               aliases=['ca'],
-    #                                               formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
-    #                                               help=help_str)
-    # setup_collapse_asset_parser(sub_parser=collapse_asset_parser,
     #                             localization_obj=localization_obj,
     #                             name_required=asset_name_required,
     #                             asset_parent_path_required=asset_parent_path_required)
@@ -2692,7 +2682,9 @@ def subtask_add_metadata(args,
                                                     path_required=False,
                                                     name_required=True)
             repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-            repo_obj.add_metadata(uri=uri, metadata=args.metadata)
+            repo_obj.add_metadata(uri=uri,
+                                  metadata=args.metadata,
+                                  log_str=log_str)
 
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -2768,7 +2760,8 @@ def subtask_delete_all_metadata(args,
                                                     path_required=False,
                                                     name_required=True)
             repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-            repo_obj.delete_all_metadata(uri=uri)
+            repo_obj.delete_all_metadata(uri=uri,
+                                         log_str=log_str)
 
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -3020,6 +3013,11 @@ def subtask_add_thumbnails(args,
     if args.poster_frame_num is None:
         args.poster_frame_num = "0"
 
+    if int(args.poster_frame_num) < 0 or int(args.poster_frame_num) > len(args.thumbnails_p):
+        err_msg = localization_obj.get_error_msg(11007)
+        err_msg = err_msg.format(frame_no=args.poster_frame_num, frame_range=f"1 to {len(args.thumbnails_p)}")
+        raise SquirrelError(err_msg, 11007)
+
     try:
         uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
                                                 repo_required=False,
@@ -3028,7 +3026,7 @@ def subtask_add_thumbnails(args,
         repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
         repo_obj.add_thumbnails(uri=uri,
                                 thumbnails_p=args.thumbnails_p,
-                                poster_p=args.thumbnails_p[int(args.poster_frame_num)],
+                                poster_p=args.thumbnails_p[int(args.poster_frame_num) - 1],
                                 version=args.version,
                                 log_str=log_str)
     except SquirrelError as e:
@@ -3210,7 +3208,8 @@ def subtask_publish(args,
                          items=args.source_paths,
                          merge=not args.clean_publish,
                          do_verified_copy=args.verified_copy,
-                         link_in_place=args.link_in_place)
+                         link_in_place=args.link_in_place,
+                         log_str=log_str)
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
@@ -3255,7 +3254,8 @@ def subtask_collapse(args,
                                                 name_required=True,
                                                 name_must_exist=False)
         repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-        repo_obj.collapse(uri=uri)
+        repo_obj.collapse(uri=uri,
+                          log_str=log_str)
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
