@@ -12,6 +12,7 @@ from squirrel.asset.keywords import Keywords
 from squirrel.asset.keyvaluepairs import KeyValuePairs
 import bvzversionedfiles.bvzversionedfiles as bvzversionedfiles
 from bvzversionedfiles.copydescriptor import Copydescriptor
+from bvzframespec import Framespec
 
 from squirrel.shared.constants import *
 
@@ -577,7 +578,8 @@ class Asset(object):
     def store(self,
               copydescriptors,
               merge,
-              verify_copy=False):
+              verify_copy=False,
+              log_str=None):
         """
         Stores the files given by sources_obj to a new version.
 
@@ -588,6 +590,8 @@ class Asset(object):
         :param verify_copy:
                If True, then each file will be checksummed before and after copying to make sure the copy worked as
                expected. Defaults to False.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                The version object where the data was stored.
@@ -600,15 +604,12 @@ class Asset(object):
         assert type(verify_copy) == bool
 
         version_obj = self._create_version(merge)
-        # self.versions[version_obj.version_str] = version_obj
-
-        bvzversionedfiles.copy_files_deduplicated(
-            copydescriptors=copydescriptors,
-            dest_d=version_obj.version_d,
-            data_d=self.data_d,
-            ver_prefix="sqv",
-            num_digits=4,
-            do_verified_copy=verify_copy)
+        bvzversionedfiles.copy_files_deduplicated(copydescriptors=copydescriptors,
+                                                  dest_d=version_obj.version_d,
+                                                  data_d=self.data_d,
+                                                  ver_prefix="sqv",
+                                                  num_digits=4,
+                                                  do_verified_copy=verify_copy)
 
         # Create the default pin (if the config is set up to do that)
         if self.config_obj.get_boolean("asset_settings", "auto_create_default_pin"):
@@ -618,16 +619,25 @@ class Asset(object):
                          locked=True,
                          allow_delete_locked=True)
 
+        if log_str is not None:
+            files = [item.source_p for item in copydescriptors]
+            log_msg = self.localized_resource_obj.get_msg("log_str_store")
+            log_str += log_msg.format(version=version_obj.version_str, files=", ".join(files))
+            self.append_to_log(log_str)
+
         return version_obj
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_version(self,
-                       version_str):
+                       version_str,
+                       log_str=None):
         """
         Deletes the version given by version_str.
 
         :param version_str:
                 The string that identifies the version.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -644,13 +654,15 @@ class Asset(object):
             err_msg = err_msg.format(version=version_str)
             raise SquirrelError(err_msg, 11000)
 
+        # Build a list of all the other versions so that we can build a list of their files (we will be keeping those)
         version_strings = self.version_strings.copy()  # We will be modifying this list, so make a copy
         version_strings.remove(version_str)  # Remove the version to be deleted. We don't want to keep these files.
+
         files_to_keep = list()
         for version_to_keep_str in version_strings:
-            version_obj = self._new_version_obj(version_str=version_to_keep_str,
-                                                version_must_exist=True)
-            files_to_keep.extend(version_obj.user_data_files())
+            version_to_keep_obj = self._new_version_obj(version_str=version_to_keep_str,
+                                                        version_must_exist=True)
+            files_to_keep.extend(version_to_keep_obj.user_data_files())
 
         version_obj = self._new_version_obj(version_str=version_str,
                                             version_must_exist=True)
@@ -660,13 +672,22 @@ class Asset(object):
         self.version_strings.remove(version_str)
         self.version_ints.remove(self._version_int_from_str(version_str))
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_delete_version")
+            log_str += log_msg.format(version=version_str)
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
-    def collapse(self):
+    def collapse(self,
+                 log_str=None):
         """
         Deletes all versions in an asset except the highest version number.
 
         This is a DANGEROUS function and should be wrapped in a metric ton of warnings before the user is allowed to
         execute it. There is no backup and there is no undo.
+
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return: Nothing.
         """
@@ -679,12 +700,19 @@ class Asset(object):
             version_str = self._version_str_from_int(version_int)
             self.delete_version(version_str=version_str)
 
+        if log_str is not None:
+            latest_version_str = self._version_str_from_int(latest_version_int)
+            log_msg = self.localized_resource_obj.get_msg("log_str_collapse")
+            log_str += log_msg.format(version=latest_version_str)
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def set_pin(self,
                 pin_n,
                 version_str,
                 locked,
-                allow_delete_locked):
+                allow_delete_locked,
+                log_str=None):
         """
         Sets a pin for the current asset with the name "name" to the version given by "version".
 
@@ -698,6 +726,8 @@ class Asset(object):
                 If True, then if there is a previous version of this pin, it will first be deleted regardless of locked
                 status. If False, and if there is a previous version of this pin that is locked, then an error is
                 raised.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -712,10 +742,16 @@ class Asset(object):
         pin_obj.create_link(allow_delete_locked=allow_delete_locked,
                             lock=locked)
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_set_pin")
+            log_str += log_msg.format(version=version_str, pin=pin_n.upper())
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def delete_pin(self,
                    pin_n,
-                   allow_delete_locked=True):
+                   allow_delete_locked=True,
+                   log_str=None):
         """
         Deletes a pin from the asset.
 
@@ -724,6 +760,8 @@ class Asset(object):
         :param allow_delete_locked:
                 If True, then locked pins may be deleted. If False, then locked pins may not be deleted. Defaults to
                 True.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 A list of all the (user-defined) pins in the asset.
@@ -742,14 +780,22 @@ class Asset(object):
                                     version_str=None)
         pin_obj.delete_link(allow_delete_locked)
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_deleted_pin")
+            log_str += log_msg.format(pin=pin_n)
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def lock_pin(self,
-                 pin_n):
+                 pin_n,
+                 log_str=None):
         """
         Locks a pin on the asset.
 
         :param pin_n:
                 The name of the pin to be removed.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 A list of all the (user-defined) pins in the asset.
@@ -768,14 +814,22 @@ class Asset(object):
                                     version_str=None)
         pin_obj.lock()
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_locked_pin")
+            log_str += log_msg.format(pin=pin_n)
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def unlock_pin(self,
-                   pin_n):
+                   pin_n,
+                   log_str=None):
         """
         unlocks a pin on the asset.
 
         :param pin_n:
                 The name of the pin to be removed.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 A list of all the (user-defined) pins in the asset.
@@ -794,6 +848,11 @@ class Asset(object):
                                     version_str=None)
         pin_obj.unlock()
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_unlocked_pin")
+            log_str += log_msg.format(pin=pin_n)
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def list_pins(self):
         """
@@ -809,7 +868,8 @@ class Asset(object):
     def add_thumbnails(self,
                        thumbnails_p,
                        poster_p=None,
-                       version_str=None):
+                       version_str=None,
+                       log_str=None):
         """
         Adds thumbnail images. If version is None, then the thumbnails will be set on the latest version. If
         poster_frame is not None, then the poster_frame will be set to that frame number. If poster is None, then the
@@ -823,35 +883,60 @@ class Asset(object):
                 Defaults to None.
         :param version_str:
                 The version to add the thumbnails to. If None, then the latest version will be used. Defaults to None.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
         """
 
-        # version_obj = self._version_obj_from_version_str(version_str=version_str)
         version_obj = self._new_version_obj(version_str=version_str,
                                             version_must_exist=True)
         version_obj.add_thumbnails(thumbnails_p=thumbnails_p,
                                    poster_p=poster_p)
 
+        if log_str is not None:
+            fs = Framespec()
+            fs.files = thumbnails_p
+            log_msg = self.localized_resource_obj.get_msg("log_str_added_thumbnails")
+            log_str += log_msg.format(version=version_str, thumbnails=fs.framespec_str)
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def delete_thumbnails(self,
-                          version_str):
+                          version_str,
+                          log_str=None):
         """
         Deletes the thumbnails from a specific version.
 
         :param version_str:
                 The version to delete the thumbnails from. If None, then the latest version will be used. Defaults to
                 None.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
         """
 
-        # version_obj = self._version_obj_from_version_str(version_str=version_str)
+        # Build a list of all the other versions so that we can build a list of their files (we will be keeping those)
+        version_strings = self.version_strings.copy()  # We will be modifying this list, so make a copy
+        version_strings.remove(version_str)  # Remove the version to be deleted. We don't want to keep these files.
+
+        files_to_keep = list()
+        for version_to_keep_str in version_strings:
+            version_to_keep_obj = self._new_version_obj(version_str=version_to_keep_str,
+                                                        version_must_exist=True)
+            files_to_keep.extend(version_to_keep_obj.thumbnail_data_files())
+
         version_obj = self._new_version_obj(version_str=version_str,
                                             version_must_exist=True)
-        version_obj.delete_thumbnails(all_version_objs=list(self.versions.values()))
+        version_obj.delete_thumbnails(files_to_keep=files_to_keep)
+
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_deleted_thumbnails")
+            log_str += log_msg.format(version=version_str)
+            self.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_thumbnails(self,
@@ -866,7 +951,6 @@ class Asset(object):
                 A list of thumbnails (including full paths).
         """
 
-        # version_obj = self._version_obj_from_version_str(version_str=version_str)
         version_obj = self._new_version_obj(version_str=version_str,
                                             version_must_exist=True)
         return version_obj.thumbnail_symlink_files()
@@ -884,19 +968,21 @@ class Asset(object):
                 A path to the thumbnail poster file.
         """
 
-        # version_obj = self._version_obj_from_version_str(version_str=version_str)
         version_obj = self._new_version_obj(version_str=version_str,
                                             version_must_exist=True)
         return version_obj.thumbnail_poster_file()
 
     # ------------------------------------------------------------------------------------------------------------------
     def add_keywords(self,
-                     keywords):
+                     keywords,
+                     log_str=None):
         """
         Adds keywords.
 
         :param keywords:
                 A single keyword string or a list of keywords.
+       :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -905,14 +991,22 @@ class Asset(object):
         self._create_metadata_dir()  # On the off chance the metadata dir does not already exist (old asset for example)
         self.keywords_obj.add_keywords(keywords)
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_add_keywords")
+            log_str += log_msg.format(keywords=", ".join(keywords))
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def delete_keywords(self,
-                        keywords):
+                        keywords,
+                        log_str=None):
         """
         Removes keywords given by the list keywords.
 
         :param keywords:
                 A single keyword string or a list of keywords.
+       :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -921,6 +1015,11 @@ class Asset(object):
         assert type(keywords) is list
 
         self.keywords_obj.remove_keywords(keywords)
+
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_delete_keywords")
+            log_str += log_msg.format(keywords=", ".join(keywords))
+            self.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_keywords(self):
@@ -938,12 +1037,15 @@ class Asset(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def add_key_value_pairs(self,
-                            key_value_pairs):
+                            key_value_pairs,
+                            log_str=None):
         """
         Adds keywords.
 
         :param key_value_pairs:
                 A dictionary of key value pairs.
+       :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -954,14 +1056,22 @@ class Asset(object):
         self._create_metadata_dir()  # On the off chance the metadata dir does not already exist (old asset for example)
         self.key_values_obj.add_key_value_pairs(key_value_pairs)
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_add_key_value_pairs")
+            log_str += log_msg.format(metadata=", ".join([f"{key}={value}" for key, value in key_value_pairs.items()]))
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def delete_key_value_pairs(self,
-                               keys):
+                               keys,
+                               log_str=None):
         """
         Removes key value pairs given by the list keys.
 
         :param keys:
                 A single key string or a list of keys.
+       :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -970,6 +1080,11 @@ class Asset(object):
         assert type(keys) is list
 
         self.key_values_obj.remove_key_value_pairs(keys)
+
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_delete_key_value_pairs")
+            log_str += log_msg.format(keys=",".join(keys))
+            self.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_key_value_pairs(self):
@@ -989,7 +1104,8 @@ class Asset(object):
     def add_version_notes(self,
                           notes,
                           overwrite,
-                          version=None):
+                          version=None,
+                          log_str=None):
         """
         Sets the notes for a specified version. This is different than notes set at the asset level.
 
@@ -1000,6 +1116,8 @@ class Asset(object):
         :param version:
                 The version OR pin on which to set the notes. If the version is None, then the latest version will be
                 used. Defaults to None.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1013,15 +1131,23 @@ class Asset(object):
         version_obj.add_notes(notes=notes,
                               overwrite=overwrite)
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_add_version_notes")
+            log_str += log_msg.format(version=version, notes=notes)
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
     def delete_version_notes(self,
-                             version=None):
+                             version=None,
+                             log_str=None):
         """
         Removes all the notes for a specified version. This is different than notes set at the asset level.
 
         :param version:
                 The version string, version integer, OR pin from which to delete the notes. If None, then the latest
                 version will be used. Defaults to None.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1031,6 +1157,11 @@ class Asset(object):
 
         version_obj = self._new_version_obj(version)
         version_obj.delete_notes()
+
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_deleted_version_notes")
+            log_str += log_msg.format(version=version)
+            self.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_version_notes(self,
@@ -1054,7 +1185,8 @@ class Asset(object):
     # ------------------------------------------------------------------------------------------------------------------
     def add_asset_notes(self,
                         notes,
-                        overwrite):
+                        overwrite,
+                        log_str=None):
         """
         Sets the notes for an asset as a whole. This is different than the notes set on individual versions.
 
@@ -1062,6 +1194,8 @@ class Asset(object):
                 A string of notes to add.
         :param overwrite:
                 If True, then the notes will overwrite the current set of notes, otherwise they will be appended.
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1073,10 +1207,19 @@ class Asset(object):
         notes_p = os.path.join(self.metadata_d, "notes")
         libtext.write_to_text_file(notes_p, notes, overwrite)
 
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_added_notes")
+            log_str += log_msg.format(notes=notes)
+            self.append_to_log(log_str)
+
     # ------------------------------------------------------------------------------------------------------------------
-    def delete_asset_notes(self):
+    def delete_asset_notes(self,
+                           log_str=None):
         """
         Removes all the notes for an asset as a whole. This is different than the notes set on individual versions.
+
+        :param log_str:
+                A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
         :return:
                 Nothing.
@@ -1085,6 +1228,11 @@ class Asset(object):
         notes_p = os.path.join(self.metadata_d, "notes")
         if os.path.exists(notes_p):
             os.remove(notes_p)
+
+        if log_str is not None:
+            log_msg = self.localized_resource_obj.get_msg("log_str_delete_all_asset_notes")
+            log_str += log_msg
+            self.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_asset_notes(self):
