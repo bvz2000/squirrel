@@ -261,19 +261,18 @@ class Version(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_thumbnails(self,
-                          all_version_objs):
+                          files_to_keep):
         """
         Deletes the thumbnails and poster frame.
 
-        :param all_version_objs:
-                A list of all version objects. Necessary so that we don't remove any thumbnails files that may be
-                referenced in another version.
+        :param files_to_keep:
+                A list of thumbnail files NOT to delete.
 
         :return:
                 Nothing.
         """
 
-        self.thumbnails.delete_thumbnails(all_version_objs=all_version_objs)
+        self.thumbnails.delete_thumbnails(files_to_keep=files_to_keep)
 
     # ------------------------------------------------------------------------------------------------------------------
     def user_symlink_files(self) -> list:
