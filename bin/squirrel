@@ -17,7 +17,7 @@ from squirrel.shared import setupconfig
 from squirrel.shared import constants
 
 # TODO: Remove the success strings from the run subtask functions
-# TODO: MAKE SURE EVERYTHING IS LOGGED
+# TODO: Add verification to any delete commands (as a separate function)
 
 
 # ======================================================================================================================
@@ -114,13 +114,9 @@ def initial_parser_setup(localization_obj):
     """
 
     # TODO: Add or fix the following functions:
-    #  fix: add thumbnails,
     #  fix: list thumbnails,
-    #  fix: delete thumbnails,
-    #  add: list asset disk space usage,
     #  add: delete asset version
     #  add: quick publish (no need for a uri because the full uri is embedded in the name (minus the repo)
-    #  add log,
     #  display log
 
     parser = ArgumentParser(formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter)
@@ -365,6 +361,15 @@ def initial_parser_setup(localization_obj):
                                            help=help_str)
     setup_add_thumbnails_parser(sub_parser=sub_parser_obj,
                                 localization_obj=localization_obj)
+
+    # delete-thumbnails -----------------------------------------
+    help_str = localization_obj.get_msg("delete_thumbnails_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-thumbnails",
+                                           aliases=['dt'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_thumbnails_parser(sub_parser=sub_parser_obj,
+                                   localization_obj=localization_obj)
 
     # set-pin -----------------------------------------
     help_str = localization_obj.get_msg("set_pin_help")
@@ -1424,6 +1429,42 @@ def setup_add_thumbnails_parser(sub_parser,
                             "--version",
                             type=str,
                             required=False,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_thumbnails_parser(sub_parser,
+                                   localization_obj):
+    """
+    Sets up the delete thumbnails sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_thumbnails_notes_uri_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("add_thumbnails_version_required_helpstr")
+    help_str = help_str.format(hashes="#"*constants.VERSION_NUM_DIGITS)
+    sub_parser.add_argument("-v",
+                            "--version",
+                            type=str,
+                            required=True,
                             help=help_str)
 
     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
@@ -3035,6 +3076,51 @@ def subtask_add_thumbnails(args,
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_thumbnails(args,
+                              repo_manager_obj,
+                              localization_obj,
+                              log_str):
+    """
+    Deletes thumbnails from an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    # verify that they want to actually do this
+    msg = localization_obj.get_msg("delete_thumbnails_are_you_sure")
+    print(msg.format(version=args.version))
+    msg = localization_obj.get_msg("generic_are_you_sure")
+    result = input(msg)
+    if not result.upper() == "YES":
+        msg = localization_obj.get_msg("canceled")
+        print(msg)
+        return
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.delete_thumbnails(uri=uri,
+                                   version_str=args.version,
+                                   log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 def subtask_set_pin(args,
                     repo_manager_obj,
                     localization_obj,
@@ -3925,6 +4011,10 @@ def run_sub_task(args,
 
         if args.sub_task.upper() in ["ADD-THUMBNAILS", "AT"]:
             subtask_add_thumbnails(args, repo_manager_obj, localization_obj, log_str)
+            return
+
+        if args.sub_task.upper() in ["DELETE-THUMBNAILS", "DT"]:
+            subtask_delete_thumbnails(args, repo_manager_obj, localization_obj, log_str)
             return
 
         if args.sub_task.upper() in ["SET-PIN", "SP"]:
