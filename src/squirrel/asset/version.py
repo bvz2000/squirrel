@@ -63,7 +63,6 @@ class Version(object):
         self.config_obj = config_obj
 
         self.thumbnails = Thumbnails(asset_n=self.asset_n,
-                                     version_obj=self,
                                      thumbnail_d=thumbnail_d,
                                      thumbnail_data_d=thumbnail_data_d,
                                      localized_resource_obj=self.localized_resource_obj)
@@ -158,7 +157,7 @@ class Version(object):
     # ------------------------------------------------------------------------------------------------------------------
     def _create_thumbnails_dir(self):
         """
-        Creates the thumbnails directory on disk.
+        Creates the "thumbnails" directory on disk.
 
         :return:
                 Nothing.
@@ -196,7 +195,7 @@ class Version(object):
         :param notes:
                 A string of notes to add.
         :param overwrite:
-                If True, then the notes will overwrite the current set of notes. Otherwise they will be appended.
+                If True, then the notes will overwrite the current set of notes. If False, they will be appended.
 
         :return:
                 Nothing.
