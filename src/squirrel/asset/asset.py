@@ -19,6 +19,7 @@ from squirrel.shared.constants import *
 
 VERSION_PATTERN = r"^(v)([0-9]{" + str(VERSION_NUM_DIGITS) + "})$"
 
+# TODO: Add assertions and error checking for all passed args.
 
 # ======================================================================================================================
 class Asset(object):
@@ -910,8 +911,7 @@ class Asset(object):
         Deletes the thumbnails from a specific version.
 
         :param version_str:
-                The version to delete the thumbnails from. If None, then the latest version will be used. Defaults to
-                None.
+                The version to delete the thumbnails from.
         :param log_str:
                 A string to use for logging. If None, nothing will be appended to the log. Defaults to None.
 
@@ -919,9 +919,11 @@ class Asset(object):
                 Nothing.
         """
 
-        # Build a list of all the other versions so that we can build a list of their files (we will be keeping those)
-        version_strings = self.version_strings.copy()  # We will be modifying this list, so make a copy
-        version_strings.remove(version_str)  # Remove the version to be deleted. We don't want to keep these files.
+        # TODO: Validate version
+
+        # Build a list of all the other versions so that we can build a list of their files (we will be keeping those).
+        version_strings = self.version_strings.copy()  # We will be modifying this list, so make a copy.
+        version_strings.remove(version_str)  # We don't want to keep any files from the version being deleted.
 
         files_to_keep = list()
         for version_to_keep_str in version_strings:
