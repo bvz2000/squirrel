@@ -186,6 +186,20 @@ class Thumbnails(object):
         self.set_poster_frame(poster_p=poster_p)
 
     # ------------------------------------------------------------------------------------------------------------------
+    def delete_poster(self):
+        """
+        Deletes the poster frame if it exists.
+
+        :return:
+                Nothing.
+        """
+
+        files_n = os.listdir(self.thumbnail_d)
+        for file_n in files_n:
+            if os.path.splitext(file_n)[0].lower() == "poster":
+                os.unlink(os.path.join(self.thumbnail_d, file_n))
+
+    # ------------------------------------------------------------------------------------------------------------------
     def delete_thumbnails(self,
                           files_to_keep):
         """
@@ -198,15 +212,17 @@ class Thumbnails(object):
                 Nothing.
         """
 
-        target_files_to_delete = self.version_obj.thumbnail_data_files()
+        target_files_to_delete = self.thumbnail_data_files()
 
         for delete_target in target_files_to_delete:
             if delete_target not in files_to_keep:
                 os.remove(delete_target)
 
-        symlink_files_to_delete = self.version_obj.user_thumbnail_symlink_files()
+        symlink_files_to_delete = self.thumbnail_symlink_files()
         for symlink_file_to_delete in symlink_files_to_delete:
             os.unlink(symlink_file_to_delete)
+
+        self.delete_poster()
 
     # ------------------------------------------------------------------------------------------------------------------
     def thumbnail_symlink_files(self) -> list:
@@ -221,7 +237,7 @@ class Thumbnails(object):
 
         files_n = os.listdir(self.thumbnail_d)
         for file_n in files_n:
-            if os.path.splitext(file_n)[0] == self.asset_n:
+            if os.path.splitext(os.path.splitext(file_n)[0])[0] == self.asset_n:
                 link_p = os.path.join(self.thumbnail_d, file_n)
                 if os.path.islink(link_p):
                     output.append(os.path.join(self.thumbnail_d, file_n))
