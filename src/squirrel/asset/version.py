@@ -78,6 +78,8 @@ class Version(object):
                 The version number as an integer.
         """
 
+        assert type(version_str) is str
+
         return int(version_str.split("v")[1])
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -89,7 +91,9 @@ class Version(object):
                 Nothing.
         """
 
-        assert type(self.version_str) is str
+        if not type(self.version_str) is str:
+            err_msg = self.localized_resource_obj.get_error_msg(20000)
+            raise SquirrelError(err_msg, 20000)
 
         pattern = "^v[0-9]{" + str(VERSION_NUM_DIGITS) + "}$"
         if re.match(pattern, self.version_str) is None:
@@ -242,8 +246,8 @@ class Version(object):
                        thumbnails_p,
                        poster_p=None):
         """
-        Adds thumbnail images. If version is None, then the thumbnails will be set on the latest version. If
-        poster_frame is not None, then the poster_frame will be set to that frame number. Otherwise it will be set to
+        Adds thumbnail images. If version is None, then the thumbnails will be set on the latest version. If poster_p
+        is not None, then the poster_frame will be set to that file. If poster_p None, then the poster will be set to
         the first frame. Thumbnails are stored using the same deduplication method as regular asset files.
 
         :param thumbnails_p:
@@ -255,6 +259,10 @@ class Version(object):
         :return:
                 Nothing.
         """
+
+        assert type(thumbnails_p) is list
+        for thumbnail_p in thumbnails_p:
+            assert type(thumbnail_p) is str
 
         self.thumbnails.add_thumbnails(thumbnail_paths=thumbnails_p,
                                        poster_p=poster_p)
@@ -271,6 +279,10 @@ class Version(object):
         :return:
                 Nothing.
         """
+
+        assert type(files_to_keep) is list
+        for file_to_keep in files_to_keep:
+            assert type(file_to_keep) is str
 
         self.thumbnails.delete_thumbnails(files_to_keep=files_to_keep)
 
@@ -344,6 +356,10 @@ class Version(object):
         :return:
                 Nothing.
         """
+
+        assert files_to_keep is list
+        for file_to_keep in files_to_keep:
+            assert type(file_to_keep) is str
 
         files_to_delete = self.user_data_files()
         for file_to_delete in files_to_delete:
