@@ -12,15 +12,12 @@ class Thumbnails(object):
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self,
                  asset_n,
-                 version_obj,
                  thumbnail_d,
                  thumbnail_data_d,
                  localized_resource_obj):
         """
         :param asset_n:
                 The name of the asset (thumbnails must match this name).
-        :param version_obj:
-                A version object for the version that contains (or will contain) the thumbnails.
         :param thumbnail_d:
                 The path to the thumbnail directory (where the symlinks will live).
         :param thumbnail_data_d:
@@ -32,8 +29,11 @@ class Thumbnails(object):
                Nothing.
         """
 
+        assert type(asset_n) is str
+        assert type(thumbnail_d) is str
+        assert type(thumbnail_data_d) is str
+
         self.asset_n = asset_n
-        self.version_obj = version_obj
         self.thumbnail_data_d = thumbnail_data_d
         self.thumbnail_d = thumbnail_d
         self.localized_resource_obj = localized_resource_obj
