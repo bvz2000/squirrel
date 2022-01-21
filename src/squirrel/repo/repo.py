@@ -1846,16 +1846,15 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def delete_thumbnails(self,
                           uri,
-                          version=None,
+                          version_str,
                           log_str=None):
         """
         Deletes thumbnails from the asset defined by the URI and version.
 
         :param uri:
                 The asset URI.
-        :param version:
-                The version or pin to which the thumbnails should be added. If None, then the latest version will be
-                used. Defaults to None.
+        :param version_str:
+                The version (given as a string) from which the thumbnails should be deleted.
         :param log_str:
                 A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
@@ -1864,11 +1863,11 @@ class Repo(object):
         """
 
         assert type(uri) is str
-        assert version is None or type(version) is str
+        assert version_str is None or type(version_str) is str
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.delete_thumbnails(version_str=version,
+        asset_obj.delete_thumbnails(version_str=version_str,
                                     log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
