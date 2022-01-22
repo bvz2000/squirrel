@@ -95,10 +95,7 @@ class KeyValuePairs(object):
 
         self._verify_asset_dir_exists()
 
-        assert type(keys) is list or type(keys) is str
-
-        if type(keys) is str:
-            keys = [keys]
+        assert type(keys) is list
 
         for i in range(len(keys)):
             keys[i] = keys[i].upper()
