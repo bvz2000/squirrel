@@ -369,14 +369,14 @@ class Version(object):
                 Nothing.
         """
 
-        assert files_to_keep is list
+        assert type(files_to_keep) is list
         for file_to_keep in files_to_keep:
             assert type(file_to_keep) is str
 
-        files_to_delete = self.user_data_files()
-        for file_to_delete in files_to_delete:
-            if file_to_delete not in files_to_keep:
-                os.remove(file_to_delete)
+        files_to_potentially_delete = self.user_data_files()
+        for file_to_potentially_delete in files_to_potentially_delete:
+            if file_to_potentially_delete not in files_to_keep:
+                os.remove(file_to_potentially_delete)
 
         shutil.rmtree(self.version_d, ignore_errors=True)
         shutil.rmtree(self.version_metadata_d, ignore_errors=True)
