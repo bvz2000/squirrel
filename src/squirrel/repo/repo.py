@@ -1922,7 +1922,7 @@ class Repo(object):
 
         assert type(uri) is str
         assert type(pin_n) is str
-        assert type(version_int) is str
+        assert type(version_int) is int
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
@@ -1958,6 +1958,8 @@ class Repo(object):
         assert type(pin_n) is str
         assert log_str is None or type(log_str) is str
 
+        pin_n = pin_n.upper()
+
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.delete_pin(pin_n=pin_n,
                              allow_delete_locked=allow_delete_locked,
@@ -1986,6 +1988,8 @@ class Repo(object):
         assert type(pin_n) is str
         assert log_str is None or type(log_str) is str
 
+        pin_n = pin_n.upper()
+
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.lock_pin(pin_n=pin_n,
                            log_str=log_str)
@@ -2012,6 +2016,8 @@ class Repo(object):
         assert type(uri) is str
         assert type(pin_n) is str
         assert log_str is None or type(log_str) is str
+
+        pin_n = pin_n.upper()
 
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.unlock_pin(pin_n=pin_n,
@@ -2115,6 +2121,39 @@ class Repo(object):
         # TODO: Have to update the cache with this newly published asset/version.
 
     # ------------------------------------------------------------------------------------------------------------------
+    def delete_version(self,
+                       uri,
+                       version_int,
+                       log_str=None):
+        """
+        Removes a specific version from an asset.
+
+        :param uri:
+                The URI of the asset.
+        :param version_int:
+                The version number as an integer.
+        :param log_str:
+                A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
+
+        :return:
+                Nothing.
+        """
+
+        assert type(uri) is str
+
+        uri_path = uri.split(":/")[1].split("#")[0]
+        asset_n = uri.split(":/")[1].split("#")[1]
+
+        asset_parent_d = self._get_publish_path(uri_path)
+        asset_obj = Asset(asset_parent_d=asset_parent_d,
+                          name=asset_n,
+                          config_obj=self.config_obj,
+                          localized_resource_obj=self.localized_resource_obj)
+
+        asset_obj.delete_version(version_int=version_int,
+                                 log_str=log_str)
+
+    # ------------------------------------------------------------------------------------------------------------------
     def collapse(self,
                  uri,
                  log_str=None):
@@ -2142,8 +2181,6 @@ class Repo(object):
                           localized_resource_obj=self.localized_resource_obj)
 
         asset_obj.collapse(log_str=log_str)
-
-        # TODO: Have to update the cache with this newly published asset/version.
 
     # ------------------------------------------------------------------------------------------------------------------
     def _get_publish_path(self,
