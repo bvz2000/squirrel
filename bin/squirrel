@@ -416,6 +416,15 @@ def initial_parser_setup(localization_obj):
     setup_publish_parser(sub_parser=sub_parser_obj,
                          localization_obj=localization_obj)
 
+    # delete-version -----------------------------------------
+    help_str = localization_obj.get_msg("delete_version_help")
+    sub_parser_obj = sub_parser.add_parser(name="delete-version",
+                                           aliases=['dv'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_delete_version_parser(sub_parser=sub_parser_obj,
+                                localization_obj=localization_obj)
+
     # collapse -----------------------------------------
     help_str = localization_obj.get_msg("collapse_help")
     sub_parser_obj = sub_parser.add_parser(name="collapse",
@@ -925,7 +934,7 @@ def setup_add_keywords_parser(sub_parser,
                             dest="keywords",
                             nargs="+",
                             type=str,
-                            required=False,
+                            required=True,
                             help=help_str)
 
     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
@@ -1199,7 +1208,7 @@ def setup_add_version_notes_parser(sub_parser,
     sub_parser.add_argument("-v",
                             metavar="version",
                             dest="version",
-                            type=str,
+                            type=int,
                             required=False,
                             help=help_str)
 
@@ -1240,7 +1249,7 @@ def setup_delete_version_notes_parser(sub_parser,
     help_str = localization_obj.get_msg("delete_version_notes_version_optional_helpstr")
     sub_parser.add_argument("-v",
                             "--version",
-                            type=str,
+                            type=int,
                             required=False,
                             help=help_str)
 
@@ -1276,7 +1285,7 @@ def setup_list_version_notes_parser(sub_parser,
     sub_parser.add_argument("-v",
                             metavar="version",
                             dest="version",
-                            type=str,
+                            type=int,
                             required=False,
                             help=help_str)
 
@@ -1427,7 +1436,7 @@ def setup_add_thumbnails_parser(sub_parser,
     help_str = localization_obj.get_msg("add_thumbnails_version_optional_helpstr")
     sub_parser.add_argument("-v",
                             "--version",
-                            type=str,
+                            type=int,
                             required=False,
                             help=help_str)
 
@@ -1463,7 +1472,7 @@ def setup_delete_thumbnails_parser(sub_parser,
     help_str = help_str.format(hashes="#"*constants.VERSION_NUM_DIGITS)
     sub_parser.add_argument("-v",
                             "--version",
-                            type=str,
+                            type=int,
                             required=True,
                             help=help_str)
 
@@ -1507,7 +1516,7 @@ def setup_set_pin_parser(sub_parser,
     sub_parser.add_argument("-v",
                             metavar="version",
                             dest="version",
-                            type=str,
+                            type=int,
                             required=True,
                             help=help_str)
 
@@ -1664,7 +1673,7 @@ def setup_publish_parser(sub_parser,
                             help=help_str)
 
     help_str = localization_obj.get_msg("publish_verify_copy_optional_helpstr")
-    sub_parser.add_argument("-v",
+    sub_parser.add_argument("-V",
                             "--verified-copy",
                             dest="verified_copy",
                             action="store_true",
@@ -1675,6 +1684,42 @@ def setup_publish_parser(sub_parser,
                             "--link-in-place",
                             dest="link_in_place",
                             action="store_true",
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_delete_version_parser(sub_parser,
+                                localization_obj):
+    """
+    Sets up the delete version sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("delete_uri_path_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    help_str = localization_obj.get_msg("delete_version_required_helpstr")
+    sub_parser.add_argument("-v",
+                            metavar="version",
+                            dest="version",
+                            type=int,
+                            required=True,
                             help=help_str)
 
     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
@@ -2189,8 +2234,7 @@ def subtask_list_default_repo(args,
 
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_set_default_repo(args,
-                             repo_manager_obj,
-                             localization_obj):
+                             repo_manager_obj):
     """
     Sets the default repo.
 
@@ -2198,8 +2242,6 @@ def subtask_set_default_repo(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
 
     :return:
             Nothing.
@@ -2214,9 +2256,6 @@ def subtask_set_default_repo(args,
     except LocalizationError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
-
-    success_str = localization_obj.get_msg("success_set_default_repo").format(repo_name=args.repo)
-    print(success_str)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -2336,14 +2375,14 @@ def print_asset_data(asset_obj,
         print(" ".join(output).ljust(max_lengths[char], " "), end="")
 
     if char == "v":
-        versions = asset_obj._get_all_version_strings()
+        versions = asset_obj.list_versions()
         versions.sort()
         print("  | ", end="")
         print(" ".join(versions).ljust(max_lengths[char], " "), end="")
 
     if char == "V":
         print("  | ", end="")
-        print(asset_obj._new_version_obj(None).version_str.ljust(max_lengths[char]), end="")
+        print(asset_obj.list_latest_version().ljust(max_lengths[char]), end="")
 
     if char == "P":
         print("  | ", end="")
@@ -2479,8 +2518,8 @@ def subtask_list_assets(args,
         max_lengths["k"] = max(max_lengths["k"], len(" ".join(asset_obj.list_keywords())))
         metadata = [f"{k}={v}" for k, v in asset_obj.list_key_value_pairs().items()]
         max_lengths["m"] = max(max_lengths["m"], len(" ".join(metadata)))
-        max_lengths["v"] = max(max_lengths["v"], len(" ".join(asset_obj._get_all_version_strings())))
-        max_lengths["V"] = max(max_lengths["V"], len(" ".join(asset_obj._new_version_obj(None).version_str)))
+        max_lengths["v"] = max(max_lengths["v"], len(" ".join(asset_obj.list_versions())))
+        max_lengths["V"] = max(max_lengths["V"], len(asset_obj.list_latest_version()))
         max_lengths["P"] = max(max_lengths["P"], len(" ".join(asset_obj.list_pins())))
         max_lengths["N"] = max(max_lengths["N"], len(asset_obj.list_asset_notes().replace("\n", " - ")))
     print("\n\n")
@@ -2545,7 +2584,6 @@ def subtask_list_keywords(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_add_keywords(args,
                          repo_manager_obj,
-                         localization_obj,
                          log_str):
     """
     Adds keywords to an asset.
@@ -2554,8 +2592,6 @@ def subtask_add_keywords(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log.
 
@@ -2570,7 +2606,9 @@ def subtask_add_keywords(args,
                                                     path_required=False,
                                                     name_required=False)
             repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-            repo_obj.add_keywords(uri=uri, keywords=args.keywords)
+            repo_obj.add_keywords(uri=uri,
+                                  keywords=args.keywords,
+                                  log_str=log_str)
 
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -2583,7 +2621,6 @@ def subtask_add_keywords(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_delete_keywords(args,
                             repo_manager_obj,
-                            localization_obj,
                             log_str):
     """
     Deletes keywords from an asset.
@@ -2592,8 +2629,6 @@ def subtask_delete_keywords(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log.
 
@@ -2608,7 +2643,9 @@ def subtask_delete_keywords(args,
                                                     path_required=False,
                                                     name_required=True)
             repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-            repo_obj.delete_keywords(uri=uri, keywords=args.keywords)
+            repo_obj.delete_keywords(uri=uri,
+                                     keywords=args.keywords,
+                                     log_str=log_str)
 
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -2643,7 +2680,8 @@ def subtask_delete_all_keywords(args,
                                                     path_required=False,
                                                     name_required=True)
             repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-            repo_obj.delete_all_keywords(uri=uri)
+            repo_obj.delete_all_keywords(uri=uri,
+                                         log_str=log_str)
 
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -2696,7 +2734,6 @@ def subtask_list_metadata_keys(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_add_metadata(args,
                          repo_manager_obj,
-                         localization_obj,
                          log_str):
     """
     Adds metadata to an asset.
@@ -2705,8 +2742,6 @@ def subtask_add_metadata(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -2738,7 +2773,6 @@ def subtask_add_metadata(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_delete_metadata(args,
                             repo_manager_obj,
-                            localization_obj,
                             log_str):
     """
     deletes metadata from an asset.
@@ -2747,8 +2781,6 @@ def subtask_delete_metadata(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -2763,7 +2795,9 @@ def subtask_delete_metadata(args,
                                                     path_required=False,
                                                     name_required=True)
             repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-            repo_obj.delete_metadata(uri=uri, metadata_keys=args.metadata)
+            repo_obj.delete_metadata(uri=uri,
+                                     metadata_keys=args.metadata,
+                                     log_str=log_str)
 
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -2776,7 +2810,6 @@ def subtask_delete_metadata(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_delete_all_metadata(args,
                                 repo_manager_obj,
-                                localization_obj,
                                 log_str):
     """
     deletes metadata from an asset.
@@ -2785,8 +2818,6 @@ def subtask_delete_all_metadata(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -2814,8 +2845,7 @@ def subtask_delete_all_metadata(args,
 
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_list_version_notes(args,
-                               repo_manager_obj,
-                               localization_obj):
+                               repo_manager_obj):
     """
     Lists notes from a version of an asset.
 
@@ -2823,8 +2853,6 @@ def subtask_list_version_notes(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
 
     :return:
             Nothing.
@@ -2836,7 +2864,8 @@ def subtask_list_version_notes(args,
                                                 path_required=False,
                                                 name_required=True)
         repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-        notes = repo_obj.list_version_notes(uri=uri, version_int=args.version)
+        notes = repo_obj.list_version_notes(uri=uri,
+                                            version_int=args.version)
 
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -2851,7 +2880,6 @@ def subtask_list_version_notes(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_add_version_notes(args,
                               repo_manager_obj,
-                              localization_obj,
                               log_str):
     """
     Adds notes to a version of an asset.
@@ -2860,8 +2888,6 @@ def subtask_add_version_notes(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -2890,7 +2916,6 @@ def subtask_add_version_notes(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_delete_version_notes(args,
                                  repo_manager_obj,
-                                 localization_obj,
                                  log_str):
     """
     Deletes notes from a version of an asset.
@@ -2899,8 +2924,6 @@ def subtask_delete_version_notes(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -2924,8 +2947,7 @@ def subtask_delete_version_notes(args,
 
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_list_asset_notes(args,
-                             repo_manager_obj,
-                             localization_obj):
+                             repo_manager_obj):
     """
     Lists notes from an asset.
 
@@ -2933,8 +2955,6 @@ def subtask_list_asset_notes(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
 
     :return:
             Nothing.
@@ -2961,7 +2981,6 @@ def subtask_list_asset_notes(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_add_asset_notes(args,
                             repo_manager_obj,
-                            localization_obj,
                             log_str):
     """
     Adds notes to an asset.
@@ -2970,8 +2989,6 @@ def subtask_add_asset_notes(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -2999,7 +3016,6 @@ def subtask_add_asset_notes(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_delete_asset_notes(args,
                                repo_manager_obj,
-                               localization_obj,
                                log_str):
     """
     Deletes notes from an asset.
@@ -3008,8 +3024,6 @@ def subtask_delete_asset_notes(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -3123,7 +3137,6 @@ def subtask_delete_thumbnails(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_set_pin(args,
                     repo_manager_obj,
-                    localization_obj,
                     log_str):
     """
     Sets a pin.
@@ -3132,8 +3145,6 @@ def subtask_set_pin(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -3159,7 +3170,6 @@ def subtask_set_pin(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_delete_pin(args,
                        repo_manager_obj,
-                       localization_obj,
                        log_str):
     """
     Sets a pin.
@@ -3168,8 +3178,6 @@ def subtask_delete_pin(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -3195,7 +3203,6 @@ def subtask_delete_pin(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_lock_pin(args,
                      repo_manager_obj,
-                     localization_obj,
                      log_str):
     """
     Locks a pin.
@@ -3204,8 +3211,6 @@ def subtask_lock_pin(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -3230,7 +3235,6 @@ def subtask_lock_pin(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_unlock_pin(args,
                        repo_manager_obj,
-                       localization_obj,
                        log_str):
     """
     Unlocks a pin.
@@ -3239,8 +3243,6 @@ def subtask_unlock_pin(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -3265,7 +3267,6 @@ def subtask_unlock_pin(args,
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_publish(args,
                     repo_manager_obj,
-                    localization_obj,
                     log_str):
     """
     Publish an asset.
@@ -3274,8 +3275,6 @@ def subtask_publish(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
     :param log_str:
             A string to append to the log
 
@@ -3296,6 +3295,53 @@ def subtask_publish(args,
                          do_verified_copy=args.verified_copy,
                          link_in_place=args.link_in_place,
                          log_str=log_str)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_delete_version(args,
+                           repo_manager_obj,
+                           localization_obj,
+                           log_str):
+    """
+    Delete a specific version of an asset.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+    :param localization_obj:
+            The localization object for error messages and the like.
+    :param log_str:
+            A string to append to the log
+
+    :return:
+            Nothing.
+    """
+
+    # verify that they want to actually do this
+    msg = localization_obj.get_msg("delete_version_are_you_sure")
+    print(msg)
+    msg = localization_obj.get_msg("delete_version_continue")
+    msg = msg.format(version=args.version, asset=args.uri.split("#")[1])
+    result = input(msg)
+    if not result.upper() == "YES":
+        msg = localization_obj.get_msg("canceled")
+        print(msg)
+        return
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True,
+                                                name_must_exist=False)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        repo_obj.delete_version(uri=uri,
+                                version_int=args.version,
+                                log_str=log_str)
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
@@ -3336,7 +3382,7 @@ def subtask_collapse(args,
     try:
         uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
                                                 repo_required=False,
-                                                path_required=True,
+                                                path_required=False,
                                                 name_required=True,
                                                 name_must_exist=False)
         repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
@@ -3390,355 +3436,6 @@ def subtask_collapse(args,
 #     src_p = os.getcwd()
 #
 #     subtask_store(args, localization_obj, asset_parent_path, src_p)
-
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_list_pins(args):
-#     """
-#     Lists all of the pins in an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     pins = asset.list_pins()
-#     if pins:
-#         max_len = 0
-#         for pin in pins.keys():
-#             max_len = max(max_len, len(pin))
-#         for pin in pins.keys():
-#             print(pin.rjust(max_len, " "), "->", pins[pin])
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_delete_pin(args):
-#     """
-#     Lists all of the pins in an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.delete_pin(args.pin, allow_delete_default=False)
-#     except AssetError as e:
-#         if e.code == 116:
-#             print(f"({e.code}) {e.message}")
-#             sys.exit(e.code)
-#         raise
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_add_keywords(args):
-#     """
-#     Add keywords to an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.add_keywords(args.keywords)
-#     except AssetError as e:
-#         if e.code == 118:
-#             print(f"({e.code}) {e.message}")
-#             sys.exit(e.code)
-#         raise
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_delete_keywords(args):
-#     """
-#     Delete keywords from an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.delete_keywords(args.keywords)
-#     except AssetError as e:
-#         if e.code == 118:
-#             print(f"({e.code}) {e.message}")
-#             sys.exit(e.code)
-#         raise
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_list_keywords(args):
-#     """
-#     Lists the keywords assigned to an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         print("\n".join(asset.list_keywords()))
-#     except AssetError as e:
-#         if e.code == 118:
-#             print(f"({e.code}) {e.message}")
-#             sys.exit(e.code)
-#         raise
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_add_metadata(args):
-#     """
-#     Add metadata (key/value pairs) to an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     # Reprocess the args because they need to be separated on commas, not spaces.
-#     args_str = " ".join(args.metadata)
-#     args_str = args_str.replace(r"\,", "BVZCOMMABVZ")
-#     args_list = args_str.split(",")
-#     args_dict = dict()
-#
-#     for arg in args_list:
-#         key, value = arg.split("=", 1)
-#         key = key.strip()
-#         value = value.strip().replace("BVZCOMMABVZ", ",")
-#         args_dict[key] = value
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.add_key_value_pairs(args_dict)
-#     except AssetError as e:
-#         if e.code == 118:
-#             print(f"({e.code}) {e.message}")
-#             sys.exit(e.code)
-#         raise
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_delete_metadata(args):
-#     """
-#     Delete metadata (key/value pairs) from an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.delete_key_value_pairs(args.metadata_keys)
-#     except AssetError as e:
-#         if e.code == 119:
-#             print(f"({e.code}) {e.message}")
-#             sys.exit(e.code)
-#         raise
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_list_metadata(args):
-#     """
-#     Lists the metadata (key/value pairs) assigned to an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         metadata = asset.list_key_value_pairs()
-#     except AssetError as e:
-#         if e.code == 119:
-#             print(f"({e.code}) {e.message}")
-#             sys.exit(e.code)
-#         raise
-#
-#     for key, value in metadata.items():
-#         print(key, "=", value)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_add_notes(args,
-#                       config_obj):
-#     """
-#     Adds notes to a specific version of an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#     :param config_obj:
-#             The config object responsible for reading the config file.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     if args.version is None:
-#         args.version = config_obj.get_item("preferences", "default_pin_name")
-#
-#     notes = " ".join(args.notes)
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.add_notes(version=args.version,
-#                         notes=notes,
-#                         overwrite=args.overwrite)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_display_notes(args,
-#                           config_obj):
-#     """
-#     Lists notes from a specific version of an asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#     :param config_obj:
-#             The config object responsible for reading the config file.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     if args.version is None:
-#         args.version = config_obj.get_item("preferences", "default_pin_name")
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         notes = asset.display_notes(version=args.version)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     print(notes)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_append_log(args):
-#     """
-#     Appends text to the log.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     text = " ".join(args.text)
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.append_to_log(text=text)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
 #
 #
 # # ----------------------------------------------------------------------------------------------------------------------
@@ -3768,91 +3465,6 @@ def subtask_collapse(args,
 #         sys.exit(e.code)
 #
 #     print(text)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_delete_version(args,
-#                            config_obj):
-#     """
-#     Deletes a version from the asset..
-#
-#     :param args:
-#             The parsed arguments object.
-#     :param config_obj:
-#             The config object responsible for reading the config file.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     if args.versions is None:
-#         args.versions = config_obj.get_item("preferences", "default_pin_name")
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.delete_versions(delete_versions=args.versions)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_collapse_asset(args,
-#                            localization_obj):
-#     """
-#     Deletes all but the latest version from the asset..
-#
-#     :param args:
-#             The parsed arguments object.
-#     :param localization_obj:
-#             The localization object that contains all of the help strings in the appropriate language.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     accept_list = ["YES"]
-#     quit_list = ["NO", "N", "QUIT", "Q"]
-#
-#     warn_msg = localization_obj.get_msg("warn_collapse")
-#     warn_msg = warn_msg.format(asset_name=args.name,
-#                                dir=args.directory)
-#
-#     result = ""
-#     print(warn_msg)
-#     while result.upper() not in accept_list and result.upper() not in quit_list:
-#         try:
-#             result = input("> ")
-#         except KeyboardInterrupt:
-#             print()
-#             return
-#         if result.upper() not in accept_list and result.upper() not in quit_list:
-#             please_yes_no_msg = localization_obj.get_msg("please_yes_no")
-#             print(please_yes_no_msg)
-#
-#     if result.upper() in quit_list:
-#         return
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         asset.collapse(del_orphaned_pins=True)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -3877,6 +3489,7 @@ def validate_args(args,
             print(err_msg)
             sys.exit(503)
 
+    # TODO: This probably is no longer relevant and can be stripped out...
     try:
         if args.directory is None:
             args.directory = os.path.split(os.getcwd())[0]
@@ -3910,135 +3523,197 @@ def run_sub_task(args,
     try:
 
         if args.sub_task.upper() in ["MAKE-REPO", "MR"]:
-            subtask_make_repo(args, repo_manager_obj)
+            subtask_make_repo(args=args,
+                              repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["ADD-REPO", "AR"]:
-            subtask_add_repo(args, repo_manager_obj)
+            subtask_add_repo(args=args,
+                             repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["REMOVE-REPO", "REMR"]:
-            subtask_remove_repo(args, repo_manager_obj)
+            subtask_remove_repo(args=args,
+                                repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["REBUILD-REPO", "RR"]:
-            subtask_rebuild_repo(args, repo_manager_obj)
+            subtask_rebuild_repo(args=args,
+                                 repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["LIST-REPOS", "LR"]:
-            subtask_list_repos(args, repo_manager_obj)
+            subtask_list_repos(args=args,
+                               repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["LIST-MISSING-REPOS", "LMR"]:
-            subtask_list_missing_repos(args, repo_manager_obj)
+            subtask_list_missing_repos(args=args,
+                                       repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["REMOVE-MISSING-REPOS", "RMR"]:
-            subtask_remove_missing_repos(repo_manager_obj)
+            subtask_remove_missing_repos(repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["LIST-DEFAULT-REPO", "LDR"]:
-            subtask_list_default_repo(args, repo_manager_obj, localization_obj)
+            subtask_list_default_repo(args=args,
+                                      repo_manager_obj=repo_manager_obj,
+                                      localization_obj=localization_obj)
             return
 
         if args.sub_task.upper() in ["SET-DEFAULT-REPO", "SDR"]:
-            subtask_set_default_repo(args, repo_manager_obj, localization_obj)
+            subtask_set_default_repo(args=args,
+                                     repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["UPDATE-REPO-CACHES", "URC"]:
-            subtask_update_repo_caches(args, repo_manager_obj, localization_obj)
+            subtask_update_repo_caches(args=args,
+                                       repo_manager_obj=repo_manager_obj,
+                                       localization_obj=localization_obj)
             return
 
         if args.sub_task.upper() in ["LIST-ASSETS", "LA"]:
-            subtask_list_assets(args, repo_manager_obj, localization_obj)
+            subtask_list_assets(args=args,
+                                repo_manager_obj=repo_manager_obj,
+                                localization_obj=localization_obj)
             return
 
         if args.sub_task.upper() in ["ADD-KEYWORDS", "AK"]:
-            subtask_add_keywords(args, repo_manager_obj, localization_obj, log_str)
+            subtask_add_keywords(args=args,
+                                 repo_manager_obj=repo_manager_obj,
+                                 log_str=log_str)
             return
 
         if args.sub_task.upper() in ["DELETE-KEYWORDS", "DK"]:
-            subtask_delete_keywords(args, repo_manager_obj, localization_obj, log_str)
+            subtask_delete_keywords(args=args,
+                                    repo_manager_obj=repo_manager_obj,
+                                    log_str=log_str)
             return
 
         if args.sub_task.upper() in ["DELETE-ALL-KEYWORDS", "DAK"]:
-            subtask_delete_all_keywords(args, repo_manager_obj, localization_obj)
+            subtask_delete_all_keywords(args=args,
+                                        repo_manager_obj=repo_manager_obj,
+                                        log_str=log_str)
             return
 
         if args.sub_task.upper() in ["LIST-KEYWORDS", "LK"]:
-            subtask_list_keywords(args, repo_manager_obj)
+            subtask_list_keywords(args=args,
+                                  repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["LIST-METADATA", "LM"]:
-            subtask_list_metadata_keys(args, repo_manager_obj)
+            subtask_list_metadata_keys(args=args,
+                                       repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["ADD-METADATA", "AM"]:
-            subtask_add_metadata(args, repo_manager_obj, localization_obj, log_str)
+            subtask_add_metadata(args=args,
+                                 repo_manager_obj=repo_manager_obj,
+                                 log_str=log_str)
             return
 
         if args.sub_task.upper() in ["DELETE-METADATA", "DM"]:
-            subtask_delete_metadata(args, repo_manager_obj, localization_obj, log_str)
+            subtask_delete_metadata(args=args,
+                                    repo_manager_obj=repo_manager_obj,
+                                    log_str=log_str)
             return
 
         if args.sub_task.upper() in ["DELETE-ALL-METADATA", "DAM"]:
-            subtask_delete_all_metadata(args, repo_manager_obj, localization_obj, log_str)
+            subtask_delete_all_metadata(args=args,
+                                        repo_manager_obj=repo_manager_obj,
+                                        log_str=log_str)
             return
 
         if args.sub_task.upper() in ["ADD-VERSION-NOTES", "AVN"]:
-            subtask_add_version_notes(args, repo_manager_obj, localization_obj, log_str)
+            subtask_add_version_notes(args=args,
+                                      repo_manager_obj=repo_manager_obj,
+                                      log_str=log_str)
             return
 
         if args.sub_task.upper() in ["DELETE-VERSION-NOTES", "DVN"]:
-            subtask_delete_version_notes(args, repo_manager_obj, localization_obj, log_str)
+            subtask_delete_version_notes(args=args,
+                                         repo_manager_obj=repo_manager_obj,
+                                         log_str=log_str)
             return
 
         if args.sub_task.upper() in ["LIST-VERSION-NOTES", "LVN"]:
-            subtask_list_version_notes(args, repo_manager_obj, localization_obj)
+            subtask_list_version_notes(args=args,
+                                       repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["ADD-ASSET-NOTES", "AAN"]:
-            subtask_add_asset_notes(args, repo_manager_obj, localization_obj, log_str)
+            subtask_add_asset_notes(args=args,
+                                    repo_manager_obj=repo_manager_obj,
+                                    log_str=log_str)
             return
 
         if args.sub_task.upper() in ["DELETE-ASSET-NOTES", "DAN"]:
-            subtask_delete_asset_notes(args, repo_manager_obj, localization_obj, log_str)
+            subtask_delete_asset_notes(args=args,
+                                       repo_manager_obj=repo_manager_obj,
+                                       log_str=log_str)
             return
 
         if args.sub_task.upper() in ["LIST-ASSET-NOTES", "LAN"]:
-            subtask_list_asset_notes(args, repo_manager_obj, localization_obj)
+            subtask_list_asset_notes(args=args,
+                                     repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["ADD-THUMBNAILS", "AT"]:
-            subtask_add_thumbnails(args, repo_manager_obj, localization_obj, log_str)
+            subtask_add_thumbnails(args=args,
+                                   repo_manager_obj=repo_manager_obj,
+                                   localization_obj=localization_obj,
+                                   log_str=log_str)
             return
 
         if args.sub_task.upper() in ["DELETE-THUMBNAILS", "DT"]:
-            subtask_delete_thumbnails(args, repo_manager_obj, localization_obj, log_str)
+            subtask_delete_thumbnails(args=args,
+                                      repo_manager_obj=repo_manager_obj,
+                                      localization_obj=localization_obj,
+                                      log_str=log_str)
             return
 
         if args.sub_task.upper() in ["SET-PIN", "SP"]:
-            subtask_set_pin(args, repo_manager_obj, localization_obj, log_str)
+            subtask_set_pin(args=args,
+                            repo_manager_obj=repo_manager_obj,
+                            log_str=log_str)
             return
 
         if args.sub_task.upper() in ["DELETE-PIN", "DP"]:
-            subtask_delete_pin(args, repo_manager_obj, localization_obj, log_str)
+            subtask_delete_pin(args=args,
+                               repo_manager_obj=repo_manager_obj,
+                               log_str=log_str)
             return
 
         if args.sub_task.upper() in ["LOCK-PIN", "LP"]:
-            subtask_lock_pin(args, repo_manager_obj, localization_obj, log_str)
+            subtask_lock_pin(args=args,
+                             repo_manager_obj=repo_manager_obj,
+                             log_str=log_str)
             return
 
         if args.sub_task.upper() in ["UNLOCK-PIN", "UP"]:
-            subtask_unlock_pin(args, repo_manager_obj, localization_obj, log_str)
+            subtask_unlock_pin(args=args,
+                               repo_manager_obj=repo_manager_obj,
+                               log_str=log_str)
             return
 
         if args.sub_task.upper() in ["PUBLISH", "P"]:
-            subtask_publish(args, repo_manager_obj, localization_obj, log_str)
+            subtask_publish(args=args,
+                            repo_manager_obj=repo_manager_obj,
+                            log_str=log_str)
             return
 
+        if args.sub_task.upper() in ["DELETE-VERSION", "DV"]:
+            subtask_delete_version(args=args,
+                                   repo_manager_obj=repo_manager_obj,
+                                   localization_obj=localization_obj,
+                                   log_str=log_str)
+
         if args.sub_task.upper() in ["COLLAPSE", "C"]:
-            subtask_collapse(args, repo_manager_obj, localization_obj, log_str)
+            subtask_collapse(args=args,
+                             repo_manager_obj=repo_manager_obj,
+                             localization_obj=localization_obj,
+                             log_str=log_str)
             return
 
     except SquirrelError as e:
