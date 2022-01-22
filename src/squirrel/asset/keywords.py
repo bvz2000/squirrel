@@ -68,7 +68,7 @@ class Keywords(object):
     def add_keywords(self,
                      keywords):
         """
-        Adds keywords to the keywords metadata file.
+        Adds keywords to the "keywords" metadata file.
 
         :param keywords:
                 The list of keywords to add.
@@ -77,13 +77,12 @@ class Keywords(object):
                 Nothing.
         """
 
-        assert type(keywords) is list or type(keywords) is str
+        assert type(keywords) is list
+        for keyword in keywords:
+            assert type(keyword) is str
 
         self._verify_asset_dir_exists()
         self._verify_metadata_dir_exists()
-
-        if type(keywords) is str:
-            keywords = [keywords]
 
         try:
             existing_keywords = self.list_keywords()
@@ -105,7 +104,7 @@ class Keywords(object):
     def remove_keywords(self,
                         keywords):
         """
-        Removes keywords from the keywords metadata file.
+        Removes keywords from the "keywords" metadata file.
 
         :param keywords:
                 The list of keywords to remove.
@@ -116,10 +115,9 @@ class Keywords(object):
 
         self._verify_asset_dir_exists()
 
-        assert type(keywords) is list or type(keywords) is str
-
-        if type(keywords) is str:
-            keywords = [keywords]
+        assert type(keywords) is list
+        for keyword in keywords:
+            assert type(keyword) is str
 
         for i in range(len(keywords)):
             keywords[i] = keywords[i].upper()
@@ -134,7 +132,7 @@ class Keywords(object):
     # ------------------------------------------------------------------------------------------------------------------
     def list_keywords(self):
         """
-        Lists keywords from the keywords metadata file.
+        Lists keywords from the "keywords" metadata file.
 
         :return:
                 A list of keywords.
