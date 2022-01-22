@@ -1,11 +1,11 @@
 import errno
 import os
-import re
 import shutil
 
 import bvzfilesystemlib
 
-import bvzconfig
+from bvzconfig import Config
+from bvzlocalization import LocalizedResource
 from squirrel.asset.thumbnails import Thumbnails
 from squirrel.shared import libtext
 from squirrel.shared.squirrelerror import SquirrelError
@@ -19,18 +19,21 @@ class Version(object):
     """
 
     def __init__(self,
-                 version_str,
+                 version_int,
                  asset_n,
                  asset_d,
+                 must_exist,
                  config_obj,
                  localized_resource_obj):
         """
-        :param version_str:
-                The name of the version as a string.
+        :param version_int:
+                The version number as an integer.
         :param asset_n:
                 The name of the parent asset.
         :param asset_d:
                 The path to the asset root.
+        :param must_exist:
+                A boolean that determines whether the version must already exist on disk or not.
         :param config_obj:
                 A config object.
         :param localized_resource_obj:
@@ -40,27 +43,32 @@ class Version(object):
                Nothing.
         """
 
-        assert type(version_str) is str
-        assert type(config_obj) is bvzconfig.Config
+        assert type(version_int) is int
+        assert type(asset_n) is str
+        assert type(asset_d) is str
+        assert type(config_obj) is Config
+        assert type(localized_resource_obj) is LocalizedResource
+
+        self.localized_resource_obj = localized_resource_obj
+        self.config_obj = config_obj
 
         self.asset_n = asset_n
         self.asset_d = asset_d
+        self._validate_asset_d()
 
-        self.version_str = version_str
-        self._verify_version_format()
-        self.version_int = self._version_str_to_int(version_str)
-        self._verify_max_version_value()
+        self.version_int = version_int
+        self._validate_max_version_value()
 
+        self.version_str = f"v{str(version_int).rjust(VERSION_NUM_DIGITS, '0')}"
         self.metadata_str = "." + self.version_str
 
         self.version_d = os.path.join(self.asset_d, self.version_str)
         self.version_metadata_d = os.path.join(self.asset_d, self.metadata_str)
+        if must_exist:
+            self._validate_exists()
 
         thumbnail_d = os.path.join(self.version_metadata_d, "thumbnails")
         thumbnail_data_d = os.path.join(self.asset_d, ".thumbnaildata")
-
-        self.localized_resource_obj = localized_resource_obj
-        self.config_obj = config_obj
 
         self.thumbnails = Thumbnails(asset_n=self.asset_n,
                                      thumbnail_d=thumbnail_d,
@@ -68,40 +76,45 @@ class Version(object):
                                      localized_resource_obj=self.localized_resource_obj)
 
     # ------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def _version_str_to_int(version_str) -> int:
+    def exists(self):
         """
-        Given a version as a string, return an integer.
+        Returns True if the version as stored in self.version_str exists on disk. Both the version and the metadata
+        version must exist.
 
-        :param version_str:
-                The version number as an integer.
+        :return:
+                True if the version and metadata version exists on disk. False otherwise.
         """
 
-        assert type(version_str) is str
-
-        return int(version_str.split("v")[1])
+        return os.path.exists(self.version_d) and os.path.exists(self.version_metadata_d)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _verify_version_format(self):
+    def _validate_asset_d(self):
         """
-        Raises an error if the version format is not valid.
+        Makes sure that the asset directory exists.
+        """
+
+        if not os.path.isdir(self.asset_d):
+            err_msg = self.localized_resource_obj.get_error_msg(11208)
+            err_msg = err_msg.format(asset_dir=self.asset_d)
+            raise SquirrelError(err_msg, 11208)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _validate_exists(self):
+        """
+        Validates that a version string references an actual, existing version on disk. Raises an error if the version
+        does not properly validate.
 
         :return:
                 Nothing.
         """
 
-        if not type(self.version_str) is str:
-            err_msg = self.localized_resource_obj.get_error_msg(20000)
-            raise SquirrelError(err_msg, 20000)
-
-        pattern = "^v[0-9]{" + str(VERSION_NUM_DIGITS) + "}$"
-        if re.match(pattern, self.version_str) is None:
-            err_msg = self.localized_resource_obj.get_error_msg(11005)
+        if not self.exists():
+            err_msg = self.localized_resource_obj.get_error_msg(11000)
             err_msg = err_msg.format(version=self.version_str)
-            raise SquirrelError(err_msg, 11005)
+            raise SquirrelError(err_msg, 11000)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _verify_max_version_value(self):
+    def _validate_max_version_value(self):
         """
         If the version int is greater than the max number of possible versions, raise an error.
 
