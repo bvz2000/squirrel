@@ -379,7 +379,7 @@ class Asset(object):
         output = list()
 
         for pin_n, pin_target in self.pin_objs.items():
-            if pin_target == version_obj.version_str:
+            if pin_target.version_str == version_obj.version_str:
                 output.append(pin_n)
 
         return output
@@ -598,6 +598,7 @@ class Asset(object):
         assert log_str is None or type(log_str) is str
 
         version_obj = self._create_version(merge)
+
         bvzversionedfiles.copy_files_deduplicated(copydescriptors=copydescriptors,
                                                   dest_d=version_obj.version_d,
                                                   data_d=self.data_d,
@@ -605,11 +606,13 @@ class Asset(object):
                                                   num_digits=4,
                                                   do_verified_copy=verify_copy)
 
+        self.version_objs[version_obj.version_int] = version_obj
+
         # Create the default pin (if the config is set up to do that)
         if self.config_obj.get_boolean("asset_settings", "auto_create_default_pin"):
             pin_name = self.config_obj.get_string("asset_settings", "default_pin_name").upper()
             self.set_pin(pin_n=pin_name,
-                         version_int=version_obj.version_str,
+                         version_int=version_obj.version_int,
                          locked=True,
                          allow_delete_locked=True)
 
@@ -620,6 +623,33 @@ class Asset(object):
             self.append_to_log(log_str)
 
         return version_obj
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def list_versions(self):
+        """
+        Returns a list of all the versions (as strings).
+
+        :return:
+                List of all the versions as strings.
+        """
+
+        version_strings = list()
+        for version_obj in self.version_objs.values():
+            version_strings.append(version_obj.version_str)
+
+        return version_strings
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def list_latest_version(self):
+        """
+        Returns the latest version as a string.
+
+        :return:
+                List of all the versions as strings.
+        """
+
+        latest_version_int = self._get_highest_ver_num()
+        return self.version_objs[latest_version_int].version_str
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_version(self,
@@ -640,13 +670,14 @@ class Asset(object):
         assert type(version_int) is int
         assert log_str is None or type(log_str) is str
 
-        version_obj = self._version_object(version_int)
+        version_to_delete_obj = self._version_object(version_int)
 
         # Cannot delete the version if any pins reference it
-        pins = self._pins_from_version_obj(version_obj)
+        pins = self._pins_from_version_obj(version_to_delete_obj)
+
         if pins:
             err_msg = self.localized_resource_obj.get_error_msg(13001)
-            err_msg = err_msg.format(version=version_int)
+            err_msg = err_msg.format(version=version_int, pin=", ".join(pins))
             raise SquirrelError(err_msg, 13001)
 
         # Build a list of the files that these versions reference (we will be keeping these files)
@@ -656,7 +687,7 @@ class Asset(object):
                 files_to_keep.extend(version_obj.user_data_files())
 
         # Now delete this version
-        version_obj.delete_version(files_to_keep=files_to_keep)
+        version_to_delete_obj.delete_version(files_to_keep=files_to_keep)
 
         # Update the list of versions
         del(self.version_objs[version_int])
@@ -686,9 +717,13 @@ class Asset(object):
         # Build a list of versions to delete (all but the highest numbered version)
         latest_version_int = self._get_highest_ver_num()
 
+        version_ints_to_delete = list()
         for version_int in self.version_objs.keys():
             if version_int != latest_version_int:
-                self.delete_version(version_int=version_int)
+                version_ints_to_delete.append(version_int)
+
+        for version_int in version_ints_to_delete:
+            self.delete_version(version_int=version_int)
 
         if log_str is not None:
             version_obj = self._version_object(latest_version_int)
@@ -773,6 +808,8 @@ class Asset(object):
         assert type(allow_delete_locked) is bool
         assert log_str is None or type(log_str) is str
 
+        pin_n = pin_n.upper()
+
         pin_obj = self._pin_obj(pin_n)
         pin_obj.delete_link(allow_delete_locked)
 
@@ -800,6 +837,8 @@ class Asset(object):
         assert type(pin_n) is str
         assert log_str is None or type(log_str) is str
 
+        pin_n = pin_n.upper()
+
         pin_obj = self._pin_obj(pin_n)
         pin_obj.lock()
 
@@ -826,6 +865,8 @@ class Asset(object):
 
         assert type(pin_n) is str
         assert log_str is None or type(log_str) is str
+
+        pin_n = pin_n.upper()
 
         pin_obj = self._pin_obj(pin_n)
         pin_obj.unlock()
@@ -879,6 +920,9 @@ class Asset(object):
         assert poster_p is None or type(poster_p) is str
         assert version_int is None or type(version_int) is int
         assert log_str is None or type(log_str) is str
+
+        if version_int is None:
+            version_int = self._get_highest_ver_num()
 
         version_obj = self._version_object(version_int)
         version_obj.add_thumbnails(thumbnails_p=thumbnails_p,
@@ -956,7 +1000,7 @@ class Asset(object):
         :return:
                 A path to the thumbnail poster file.
         """
-        assert type(version_int) is str
+        assert type(version_int) is int
 
         version_obj = self._version_object(version_int)
         return version_obj.thumbnail_poster_file()
@@ -987,7 +1031,7 @@ class Asset(object):
 
         if log_str is not None:
             log_msg = self.localized_resource_obj.get_msg("log_str_add_keywords")
-            log_str += log_msg.format(keywords=", ".join(keywords))
+            log_str += log_msg.format(keywords=", ".join([keyword.upper() for keyword in keywords]))
             self.append_to_log(log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -1128,6 +1172,9 @@ class Asset(object):
         assert version_int is None or type(version_int) is int
         assert log_str is None or type(log_str) is str
 
+        if version_int is None:
+            version_int = self._get_highest_ver_num()
+
         version_obj = self._version_object(version_int)
         version_obj.add_notes(notes=notes,
                               overwrite=overwrite)
@@ -1158,6 +1205,9 @@ class Asset(object):
         assert version_int is None or type(version_int) is int
         assert log_str is None or type(log_str) is str
 
+        if version_int is None:
+            version_int = self._get_highest_ver_num()
+
         version_obj = self._version_object(version_int)
         version_obj.delete_notes()
 
@@ -1181,7 +1231,10 @@ class Asset(object):
                 Nothing.
         """
 
-        assert version_int is None or type(version_int) is str
+        assert version_int is None or type(version_int) is int
+
+        if version_int is None:
+            version_int = self._get_highest_ver_num()
 
         version_obj = self._version_object(version_int)
         return version_obj.list_notes()
