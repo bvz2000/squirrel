@@ -3,15 +3,11 @@ import os
 import pathlib
 
 import bvzversionedfiles.bvzversionedfiles as bvzversionedfiles
-from bvzversionedfiles.copydescriptor import Copydescriptor
 
 from squirrel.asset.asset import Asset
 from squirrel.shared import urilib
 from squirrel.shared.squirrelerror import SquirrelError
 from bvzframespec import Framespec
-
-# TODO: There are a bunch of doubled up verification steps (validating the uri in each function for example, or doubled
-#  up assertions). Reduce those.
 
 
 # ======================================================================================================================
@@ -116,21 +112,51 @@ class Repo(object):
                Nothing.
         """
 
-        assert os.path.exists(repo_root_d)
-        assert os.path.isdir(repo_root_d)
-        assert os.path.exists(cache_d)
+        assert type(repo_root_d) is str
+        assert type(cache_d) is str
+
+        self.repo_root_d = repo_root_d
+        self._validate_repo_root_d()
+
+        self.repo_n = os.path.split(repo_root_d.rstrip(os.sep))[1]
 
         self.cache_d = cache_d
+        self._validate_cache_d()
 
         self.localized_resource_obj = localized_resource_obj
         self.config_obj = config_obj
 
-        self.repo_n = os.path.split(repo_root_d.rstrip(os.sep))[1]
-        self.repo_root_d = repo_root_d
-
         self.sql_resources = sql_resources
         self.connection = connection
         self.cursor = cursor
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _validate_repo_root_d(self):
+        """
+        Raises an error if repo_root_d is missing or not a directory.
+
+        :return:
+                Nothing.
+        """
+
+        if not os.path.isdir(self.repo_root_d):
+            err_msg = self.localized_resource_obj.get_error_msg(302)
+            err_msg = err_msg.format(repo_path=self.repo_root_d)
+            raise SquirrelError(err_msg, 302)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _validate_cache_d(self):
+        """
+        Raises an error if cache_d is missing or not a directory.
+
+        :return:
+                Nothing.
+        """
+
+        if not os.path.isdir(self.cache_d):
+            err_msg = self.localized_resource_obj.get_error_msg(800)
+            err_msg = err_msg.format(cache_dir=self.cache_d)
+            raise SquirrelError(err_msg, 800)
 
     # ------------------------------------------------------------------------------------------------------------------
     def is_repo(self):
@@ -290,14 +316,14 @@ class Repo(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def _cache_thumbnail(self,
-                         version,
+                         version_int,
                          thumbnail_p,
                          asset_id):
         """
         Adds a single thumbnail path to the cache for the given asset_id and version.
 
-        :param version:
-                The asset version that has this particular thumbnail.
+        :param version_int:
+                The asset version number that has this particular thumbnail.
         :param thumbnail_p:
                 The thumbnail path.
         :param asset_id:
@@ -310,12 +336,12 @@ class Repo(object):
         # self.connection.set_trace_callback(print)
 
         sql = self.sql_resources.get("cache_thumbnail", "list_thumbnail")
-        rows = self.cursor.execute(sql, (asset_id, version)).fetchall()
+        rows = self.cursor.execute(sql, (asset_id, version_int)).fetchall()
         if len(rows) > 0:
             sql = self.sql_resources.get("cache_thumbnail", "update_thumbnail")
         else:
             sql = self.sql_resources.get("cache_thumbnail", "cache_thumbnail")
-        self.cursor.execute(sql, (thumbnail_p, asset_id, version))
+        self.cursor.execute(sql, (thumbnail_p, asset_id, version_int))
 
         self.connection.commit()
 
@@ -352,23 +378,24 @@ class Repo(object):
                           config_obj=self.config_obj,
                           localized_resource_obj=self.localized_resource_obj)
 
-        versions = asset_obj.versions.keys()
-        pins = asset_obj.pins.keys()
+        version_ints = asset_obj.version_objs.keys()
+        pins_n = asset_obj.pin_objs.keys()
 
-        for version_str in versions:
+        for version_int in version_ints:
             framespec_obj = Framespec()
-            framespec_obj.files = asset_obj.list_thumbnails(version_str)
+            framespec_obj.files = asset_obj.list_thumbnails(version_int)
             thumbnails_p = framespec_obj.framespec_str
-            self._cache_thumbnail(version=version_str,
+            self._cache_thumbnail(version_int=version_int,
                                   thumbnail_p=thumbnails_p,
                                   asset_id=asset_id)
 
-        for pin in pins:
-            version_str = asset_obj.pins[pin].version_obj.version_str
+        for pin_n in pins_n:
+            version_int = asset_obj.pin_objs[pin_n].version_int
             framespec_obj = Framespec()
-            framespec_obj.files = asset_obj.list_thumbnails(version_str)
+            framespec_obj.files = asset_obj.list_thumbnails(version_int)
             thumbnails_p = framespec_obj.framespec_str
-            self._cache_thumbnail(version=pin,
+            # TODO: Version_int cannot store pin_n
+            self._cache_thumbnail(version_int=pin_n,
                                   thumbnail_p=thumbnails_p,
                                   asset_id=asset_id)
 
@@ -376,14 +403,14 @@ class Repo(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def _cache_poster(self,
-                      version,
+                      version_int,
                       poster_p,
                       asset_id):
         """
         Adds a single poster path to the cache for the given asset_id and version.
 
-        :param version:
-                The asset version that has this particular poster.
+        :param version_int:
+                The asset version number that has this particular poster.
         :param poster_p:
                 The poster path.
         :param asset_id:
@@ -394,14 +421,14 @@ class Repo(object):
         """
 
         # self.connection.set_trace_callback(print)
-
+        # TODO: Check that this works with version_int instead of version_str
         sql = self.sql_resources.get("cache_poster", "list_poster")
-        rows = self.cursor.execute(sql, (asset_id, version)).fetchall()
+        rows = self.cursor.execute(sql, (asset_id, version_int)).fetchall()
         if len(rows) > 0:
             sql = self.sql_resources.get("cache_poster", "update_poster")
         else:
             sql = self.sql_resources.get("cache_poster", "cache_poster")
-        self.cursor.execute(sql, (poster_p, asset_id, version))
+        self.cursor.execute(sql, (poster_p, asset_id, version_int))
 
         self.connection.commit()
 
@@ -438,23 +465,24 @@ class Repo(object):
                           config_obj=self.config_obj,
                           localized_resource_obj=self.localized_resource_obj)
 
-        versions = asset_obj.versions.keys()
-        pins = asset_obj.pins.keys()
+        version_ints = asset_obj.version_objs.keys()
+        pins_n = asset_obj.pin_objs.keys()
 
-        for version_str in versions:
-            poster_p = asset_obj.list_poster(version_str)
+        for version_int in version_ints:
+            poster_p = asset_obj.list_poster(version_int)
             if not poster_p:
                 poster_p = ""
-            self._cache_poster(version=version_str,
+            self._cache_poster(version_int=version_int,
                                poster_p=poster_p,
                                asset_id=asset_id)
 
-        for pin in pins:
-            version_str = asset_obj.pins[pin].version_obj.version_str
-            poster_p = asset_obj.list_poster(version_str)
+        for pin_n in pins_n:
+            version_int = asset_obj.pin_objs[pin_n].version_int
+            poster_p = asset_obj.list_poster(version_int)
             if not poster_p:
                 poster_p = ""
-            self._cache_poster(version=pin,
+            # TODO: How to cache this with a pin name
+            self._cache_poster(version_int=pin_n,
                                poster_p=poster_p,
                                asset_id=asset_id)
 
@@ -1646,14 +1674,14 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def list_version_notes(self,
                            uri,
-                           version=None):
+                           version_int=None):
         """
         Lists all of the notes from the asset given by the URI. If a version is given, then the notes will be taken from
         that version. If version is None, then the notes will be taken from the latest version.
 
         :param uri:
                 The URI of the asset.
-        :param version:
+        :param version_int:
                 The version number to retrieve notes from. If None, then the latest version is used. Defaults to None.
 
         :return:
@@ -1661,17 +1689,17 @@ class Repo(object):
         """
 
         assert type(uri) is str
-        assert version is None or type(version) is str
+        assert version_int is None or type(version_int) is int
 
         asset_obj = self.asset_obj_from_uri(uri)
 
-        return asset_obj.list_version_notes(version=version)
+        return asset_obj.list_version_notes(version_int=version_int)
 
     # ------------------------------------------------------------------------------------------------------------------
     def add_version_notes(self,
                           notes,
                           uri,
-                          version=None,
+                          version_int=None,
                           overwrite=False,
                           log_str=None):
         """
@@ -1681,8 +1709,8 @@ class Repo(object):
                 A string to add to the asset.
         :param uri:
                 The asset URI.
-        :param version:
-                The version or pin on which to set the notes. If None, then the latest version will be used. Defaults to
+        :param version_int:
+                The version number on which to set the notes. If None, then the latest version will be used. Defaults to
                 None.
         :param overwrite:
                 If True, then the notes will overwrite the current set of notes, otherwise they will be appended.
@@ -1696,12 +1724,12 @@ class Repo(object):
 
         assert type(notes) is str
         assert type(uri) is str
-        assert version is None or type(version) is str
+        assert version_int is None or type(version_int) is int
         assert type(overwrite) is bool
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.add_version_notes(version=version,
+        asset_obj.add_version_notes(version_int=version_int,
                                     notes=notes,
                                     overwrite=overwrite,
                                     log_str=log_str)
@@ -1709,15 +1737,15 @@ class Repo(object):
     # ------------------------------------------------------------------------------------------------------------------
     def delete_version_notes(self,
                              uri,
-                             version=None,
+                             version_int=None,
                              log_str=None):
         """
         Deletes all of the notes from the asset given by the URI.
 
         :param uri:
                 The URI of the asset.
-        :param version:
-                The version or pin from which to delete the notes. If None, then the latest version will be used.
+        :param version_int:
+                The version number from which to delete the notes. If None, then the latest version will be used.
                 Defaults to None.
         :param log_str:
                 A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
@@ -1729,7 +1757,7 @@ class Repo(object):
         assert type(uri) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.delete_version_notes(version=version,
+        asset_obj.delete_version_notes(version_int=version_int,
                                        log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -1810,7 +1838,7 @@ class Repo(object):
                        uri,
                        thumbnails_p,
                        poster_p,
-                       version=None,
+                       version_int=None,
                        log_str=None):
         """
         Adds thumbnails to the asset defined by the URI and version.
@@ -1821,8 +1849,8 @@ class Repo(object):
                 A list of file paths of the thumbnail files.
         :param poster_p:
                 A path to the poster file.
-        :param version:
-                The version or pin to which the thumbnails should be added. If None, then the latest version will be
+        :param version_int:
+                The version number to which the thumbnails should be added. If None, then the latest version will be
                 used. Defaults to None.
         :param log_str:
                 A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
@@ -1834,27 +1862,27 @@ class Repo(object):
         assert type(uri) is str
         assert type(thumbnails_p) is list
         assert type(poster_p) is str
-        assert version is None or type(version) is str
+        assert version_int is None or type(version_int) is int
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.add_thumbnails(thumbnails_p=thumbnails_p,
                                  poster_p=poster_p,
-                                 version_str=version,
+                                 version_int=version_int,
                                  log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def delete_thumbnails(self,
                           uri,
-                          version_str,
+                          version_int,
                           log_str=None):
         """
         Deletes thumbnails from the asset defined by the URI and version.
 
         :param uri:
                 The asset URI.
-        :param version_str:
-                The version (given as a string) from which the thumbnails should be deleted.
+        :param version_int:
+                The version number from which the thumbnails should be deleted.
         :param log_str:
                 A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
@@ -1863,18 +1891,18 @@ class Repo(object):
         """
 
         assert type(uri) is str
-        assert version_str is None or type(version_str) is str
+        assert version_int is None or type(version_int) is int
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
-        asset_obj.delete_thumbnails(version_str=version_str,
+        asset_obj.delete_thumbnails(version_int=version_int,
                                     log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
     def set_pin(self,
                 uri,
                 pin_n,
-                version,
+                version_int,
                 log_str=None):
         """
         Sets the pin on the given asset.
@@ -1883,8 +1911,8 @@ class Repo(object):
                 The URI of the asset.
         :param pin_n:
                 The pin to set.
-        :param version:
-                The version that the pin should point to.
+        :param version_int:
+                The version number that the pin should point to.
         :param log_str:
                 A string to append to the log. If None, nothing will be appended to the log. Defaults to None.
 
@@ -1894,12 +1922,12 @@ class Repo(object):
 
         assert type(uri) is str
         assert type(pin_n) is str
-        assert type(version) is str
+        assert type(version_int) is str
         assert log_str is None or type(log_str) is str
 
         asset_obj = self.asset_obj_from_uri(uri)
         asset_obj.set_pin(pin_n=pin_n,
-                          version_str=version,
+                          version_int=version_int,
                           locked=False,
                           allow_delete_locked=False,
                           log_str=log_str)
