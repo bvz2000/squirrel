@@ -6,6 +6,7 @@ DEFAULT_REPO = "SQUIRREL_DEFAULT_REPO"
 DEFAULT_ASSET_PATH_ENV = "BVZASSET_DEFAULT_ASSET_PATH"
 BVZASSET_STRUCTURE_VERSION = "1.0"  # <- this should be updated whenever the structure of an asset is changed.
 VERSION_NUM_DIGITS = 4
+VERSION_PATTERN = r"^(v)([0-9]{" + str(VERSION_NUM_DIGITS) + "})$"
 
 ASSET_CONFIG_SECTIONS = dict()
 ASSET_CONFIG_SECTIONS["skip list regex"] = None
