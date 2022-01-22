@@ -3,16 +3,14 @@ The RepoManager class is the entry point for all actions related to repositories
 responsible for passing requests from the rest of asset management system to the individual repos.
 """
 
-import inspect
 import os
-import sqlite3
 
 from squirrel.repo.repo import Repo
+from squirrel.repo.cache import Cache
 from squirrel.repo import setuprepolist
 from squirrel.shared import constants
 from squirrel.shared import setupconfig
 from squirrel.shared import setuplocalization
-from squirrel.shared import setupsql
 from squirrel.shared import urilib
 from squirrel.shared.squirrelerror import SquirrelError
 
@@ -56,17 +54,12 @@ class RepoManager(object):
         self.repos = dict()
         self.default_repo = None
 
-        self.cache_d = self._cache_dir()
-        self.cache_p = self._cache_path()
-
-        self.sql_resources = setupsql.create_sql_object()
-        self.connection = self._connect()
-        self.cursor = self.connection.cursor()
-
-        self._load_repos_from_repos_list_object()
+        self._load_repos_from_repos_list()
         self._load_default_repo()
 
-        self.cache_all()
+        self.cache_obj = Cache(config_obj=self.config_obj,
+                               localized_resource_obj=self.localized_resource_obj)
+        self.cache_obj.cache_if_needed(self.repos.values())
 
     # ------------------------------------------------------------------------------------------------------------------
     def disambiguate_uri(self,
@@ -208,46 +201,13 @@ class RepoManager(object):
 
         # If there is a uri_path, validate it
         if uri_path:
-
-            sql = self.sql_resources.get("disambiguate_uri", "uri_path_exists")
-            rows = self.cursor.execute(sql, (repo_n, uri_path + "%")).fetchall()
-            if len(rows) == 0:
-                err_msg = self.localized_resource_obj.get_error_msg(907)
-                err_msg = err_msg.format(uri_path=uri_path)
-                raise SquirrelError(err_msg, 907)
+            self.cache_obj.validate_uri_path_against_cache(repo_n=repo_n,
+                                                           uri_path=uri_path)
 
         # If there is an asset name, validate it
         if asset_n and name_must_exist:
-
-            sql = self.sql_resources.get("disambiguate_uri", "asset_name_exists")
-            rows = self.cursor.execute(sql, (repo_n, asset_n)).fetchall()
-
-            # If no assets match this name, raise an error
-            if len(rows) == 0:
-                err_msg = self.localized_resource_obj.get_error_msg(905)
-                err_msg = err_msg.format(repo_n=repo_n, asset_n=asset_n)
-                raise SquirrelError(err_msg, 905)
-
-            # If more than one asset matches this name, raise an error
-            if len(rows) > 1:
-                err_msg = self.localized_resource_obj.get_error_msg(906)
-                err_msg = err_msg.format(repo_n=repo_n, asset_n=asset_n)
-                raise SquirrelError(err_msg, 906)
-
-            sql = self.sql_resources.get("disambiguate_uri", "get_uri_path_from_asset_n")
-            rows = self.cursor.execute(sql, (repo_n, asset_n)).fetchall()
-
-            if len(rows) == 0:
-                err_msg = self.localized_resource_obj.get_error_msg(908)
-                err_msg = err_msg.format(asset_n=asset_n)
-                raise SquirrelError(err_msg, 908)
-
-            if len(rows) > 1:
-                err_msg = self.localized_resource_obj.get_error_msg(909)
-                err_msg = err_msg.format(asset_n=asset_n)
-                raise SquirrelError(err_msg, 909)
-
-            uri_path = rows[0][0]
+            uri_path = self.cache_obj.uri_path_from_asset_name(repo_n=repo_n,
+                                                               asset_n=asset_n)
 
         return f"{repo_n}:/{uri_path}#{asset_n}"
 
@@ -263,11 +223,7 @@ class RepoManager(object):
         :return:
                 A URI.
         """
-
-        sql = self.sql_resources.get("sql", "asset_uri_from_path")
-        rows = self.cursor.execute(sql, (asset_p,)).fetchall()
-
-        return rows[0][0]
+        return self.cache_obj.uri_from_asset_path(asset_p)
 
     # ------------------------------------------------------------------------------------------------------------------
     def uri_path_from_asset_path(self,
@@ -282,10 +238,7 @@ class RepoManager(object):
                 A URI path.
         """
 
-        sql = self.sql_resources.get("sql", "asset_uri_path_from_path")
-        rows = self.cursor.execute(sql, (asset_p,)).fetchall()
-
-        return rows[0][0]
+        return self.cache_obj.uri_path_from_asset_path(asset_p)
 
     # ------------------------------------------------------------------------------------------------------------------
     def repo_obj_from_uri(self,
@@ -340,174 +293,6 @@ class RepoManager(object):
 
         self.default_repo = self.repos[default_repo_name]
 
-    # ----------------------------------------------------------------------------------------------------------------
-    def _cache_dir(self):
-        """
-        Returns the path to the directory where the cache file is stored.
-
-        :return:
-                A path to the directory in which cache files are stored.
-        """
-
-        if constants.CACHE_PATH_ENV_VAR in os.environ.keys():
-            cache_d = os.environ[constants.CACHE_PATH_ENV_VAR]
-        elif self.config_obj.get_string("repo_settings", "cache_dir") != "":
-            cache_d = self.config_obj.get_string("repo_settings", "cache_dir")
-        else:
-            module_d = os.path.split(inspect.stack()[0][1])[0]
-            cache_d = os.path.join(module_d, "..", "..", "..", "cache")
-
-        if not os.path.isdir(cache_d):
-            err_msg = self.localized_resource_obj.get_error_msg(800)
-            err_msg = err_msg.format(cache_dir=cache_d,
-                                     config_dir_env_var=constants.CACHE_PATH_ENV_VAR)
-            raise SquirrelError(err_msg, 800)
-
-        return cache_d
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _cache_path(self):
-        """
-        Returns a path to the cache database file.
-
-        :return:
-                A path to the cache database file.
-        """
-
-        return os.path.join(self.cache_d, "squirrel.db")
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _connect(self):
-        """
-        Connects to the cache database.
-
-        :return:
-                A sqlite3 connection object.
-        """
-
-        return sqlite3.connect(self.cache_p)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _drop_all_cache_tables(self):
-        """
-        Drops all of the tables from the cache db.
-
-        :return:
-                Nothing.
-        """
-
-        sql = self.sql_resources.get("sql", "delete_cache_list_tables")
-        tables = self.cursor.execute(sql).fetchall()
-
-        sql = self.sql_resources.get("sql", "delete_cache_drop_tables")
-        for item in tables:
-            self.cursor.execute(sql.format(table=item[0]))
-
-        self.connection.commit()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _build_cache_tables(self):
-        """
-        Creates the empty cache tables.
-
-        :return:
-                Nothing.
-        """
-
-        self._drop_all_cache_tables()
-
-        sql = self.sql_resources.get("build_cache_tables", "assets")
-        self.cursor.execute(sql)
-        self.connection.commit()
-
-        sql = self.sql_resources.get("build_cache_tables", "keywords")
-        self.cursor.execute(sql)
-        self.connection.commit()
-
-        sql = self.sql_resources.get("build_cache_tables", "metadata")
-        self.cursor.execute(sql)
-        self.connection.commit()
-
-        sql = self.sql_resources.get("build_cache_tables", "assets_keywords")
-        self.cursor.execute(sql)
-        self.connection.commit()
-
-        sql = self.sql_resources.get("build_cache_tables", "assets_metadata")
-        self.cursor.execute(sql)
-        self.connection.commit()
-
-        sql = self.sql_resources.get("build_cache_tables", "thumbnails")
-        self.cursor.execute(sql)
-        self.connection.commit()
-
-        sql = self.sql_resources.get("build_cache_tables", "posters")
-        self.cursor.execute(sql)
-        self.connection.commit()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def build_cache_for_repo(self,
-                             uri):
-        """
-        Builds the cache for a specific repo.
-
-        :param uri:
-                The URI that holds the name of the repo.
-
-        :return:
-                Nothing.
-        """
-
-        if not urilib.validate_uri_format(uri):
-            err_msg = self.localized_resource_obj.get_error_msg(201)
-            err_msg = err_msg.format(uri=uri)
-            raise SquirrelError(err_msg, 201)
-
-        repo_n = urilib.repo_name_from_uri(uri)
-        repo_obj = self.repos[repo_n]
-        repo_obj.cache_assets_from_filesystem()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def build_cache_for_all_repos(self):
-        """
-        Builds the cache from the data on the filesystem for all repos. If the cache already exists, the current data
-        will be removed and replaced.
-
-        :return:
-                Nothing.
-        """
-
-        self._build_cache_tables()
-
-        for repo_n in self.repos.keys():
-            self.build_cache_for_repo(uri=f"{repo_n}:/#")
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def cache_all(self):
-        """
-        If the cache does not exist, or if any table is missing, create a new cache. If it does exist and all the tables
-        are good, do nothing.
-
-        :return:
-                Nothing.
-        """
-
-        if not os.path.exists(self.cache_p):
-            self.build_cache_for_all_repos()
-            return
-
-        tables = self.sql_resources.get("tables", "tables").split(",")
-        sql = self.sql_resources.get("sql", "delete_cache_list_tables")
-
-        rows = self.cursor.execute(sql).fetchall()
-
-        if len(rows) == 0:
-            self.build_cache_for_all_repos()
-
-        for row in rows:
-            if row[0] not in tables:
-                self.build_cache_for_all_repos()
-                return
-
     # ------------------------------------------------------------------------------------------------------------------
     def _load_repo(self,
                    repo_p):
@@ -529,12 +314,9 @@ class RepoManager(object):
             raise SquirrelError(err_msg, 302)
 
         repo_obj = Repo(repo_root_d=repo_p,
-                        cache_d=self.cache_d,
+                        cache_obj=self.cache_obj,
                         config_obj=self.config_obj,
-                        localized_resource_obj=self.localized_resource_obj,
-                        sql_resources=self.sql_resources,
-                        connection=self.connection,
-                        cursor=self.cursor)
+                        localized_resource_obj=self.localized_resource_obj)
 
         if not repo_obj.is_repo():
             err_msg = self.localized_resource_obj.get_error_msg(301)
@@ -579,7 +361,7 @@ class RepoManager(object):
                     raise
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _load_repos_from_repos_list_object(self):
+    def _load_repos_from_repos_list(self):
         """
         Loads all of the repos listed in the repo list file. Kicks up an error if any are missing or corrupt AND
         warn_on_load_error OR fail_on_load_error is set to True in the config file.
@@ -699,12 +481,9 @@ class RepoManager(object):
             raise SquirrelError(err_msg, 302)
 
         repo_obj = Repo(repo_root_d=repo_p,
-                        cache_d=self.cache_d,
+                        cache_obj=self.cache_obj,
                         config_obj=self.config_obj,
-                        localized_resource_obj=self.localized_resource_obj,
-                        sql_resources=self.sql_resources,
-                        connection=self.connection,
-                        cursor=self.cursor)
+                        localized_resource_obj=self.localized_resource_obj)
 
         repo_obj.bless_repo()
 
@@ -728,12 +507,9 @@ class RepoManager(object):
             raise SquirrelError(err_msg, 100)
 
         repo_obj = Repo(repo_root_d=repo_d,
-                        cache_d=self.cache_d,
+                        cache_obj=self.cache_obj,
                         config_obj=self.config_obj,
-                        localized_resource_obj=self.localized_resource_obj,
-                        sql_resources=self.sql_resources,
-                        connection=self.connection,
-                        cursor=self.cursor)
+                        localized_resource_obj=self.localized_resource_obj)
 
         # Make sure the repo name is not already taken
         if repo_obj.repo_n in self.repos.keys() and repo_d != self.repos[repo_obj.repo_n].repo_root_d:
@@ -762,12 +538,9 @@ class RepoManager(object):
         assert os.path.isdir(repo_d)
 
         repo_obj = Repo(repo_root_d=repo_d,
+                        cache_obj=self.cache_obj,
                         config_obj=self.config_obj,
-                        cache_d=self.cache_d,
-                        localized_resource_obj=self.localized_resource_obj,
-                        sql_resources=self.sql_resources,
-                        connection=self.connection,
-                        cursor=self.cursor)
+                        localized_resource_obj=self.localized_resource_obj)
 
         # Make sure the repo name is not already taken
         if repo_obj.repo_n in self.repos.keys() and repo_d != self.repos[repo_obj.repo_n].repo_root_d:
