@@ -3,6 +3,7 @@ import pathlib
 import re
 from typing import Union
 
+from bvzlocalization import LocalizedResource
 import bvzversionedfiles.bvzversionedfiles as bvzversionedfiles
 from squirrel.shared.squirrelerror import SquirrelError
 
@@ -32,6 +33,7 @@ class Thumbnails(object):
         assert type(asset_n) is str
         assert type(thumbnail_d) is str
         assert type(thumbnail_data_d) is str
+        assert type(localized_resource_obj) is LocalizedResource
 
         self.asset_n = asset_n
         self.thumbnail_data_d = thumbnail_data_d
@@ -52,6 +54,8 @@ class Thumbnails(object):
         """
 
         assert type(thumbnail_paths) is list
+        for thumbnail_path in thumbnail_paths:
+            assert type(thumbnail_path) is str
 
         for thumbnail in thumbnail_paths:
 
@@ -83,6 +87,10 @@ class Thumbnails(object):
         :return:
                 Nothing.
         """
+
+        assert type(thumbnail_paths) is list
+        for thumbnail_path in thumbnail_paths:
+            assert type(thumbnail_path) is str
 
         pattern = r"(.+)\.([0-9]+)\.(.+)"
 
@@ -123,10 +131,11 @@ class Thumbnails(object):
                 Nothing.
         """
 
+        assert type(poster_p) is str
+
         self._verify_thumbnail_paths([poster_p])
 
         ext = os.path.splitext(poster_p)[1]
-
         try:
             copydescriptors = bvzversionedfiles.single_file_to_copydescriptors(file_p=poster_p,
                                                                                relative_d="",
@@ -163,6 +172,8 @@ class Thumbnails(object):
         """
 
         assert type(thumbnail_paths) is list
+        for thumbnail_path in thumbnail_paths:
+            assert type(thumbnail_path) is str
         assert poster_p is None or type(poster_p) is str
 
         self._verify_thumbnail_paths(thumbnail_paths=thumbnail_paths)
@@ -211,6 +222,10 @@ class Thumbnails(object):
         :return:
                 Nothing.
         """
+
+        assert type(files_to_keep) is list
+        for files_to_keep in files_to_keep:
+            assert type(files_to_keep) is str
 
         target_files_to_delete = self.thumbnail_data_files()
 
