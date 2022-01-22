@@ -224,9 +224,8 @@ class Thumbnails(object):
         """
 
         assert type(files_to_keep) is list
-        for files_to_keep in files_to_keep:
-            assert type(files_to_keep) is str
-
+        for file_to_keep in files_to_keep:
+            assert type(file_to_keep) is str
         target_files_to_delete = self.thumbnail_data_files()
 
         for delete_target in target_files_to_delete:
@@ -272,7 +271,7 @@ class Thumbnails(object):
 
         links_p = self.thumbnail_symlink_files()
         for link_p in links_p:
-            output.append(pathlib.Path(link_p).resolve())
+            output.append(str(pathlib.Path(link_p).resolve()))
 
         return output
 
