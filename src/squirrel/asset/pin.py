@@ -1,7 +1,11 @@
 import os
+from pathlib import Path
+import re
 
 from bvzlocalization import LocalizedResource
+from squirrel.asset.version import Version
 from squirrel.shared.squirrelerror import SquirrelError
+from squirrel.shared.constants import *
 
 
 # ======================================================================================================================
@@ -13,45 +17,100 @@ class Pin(object):
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self,
                  pin_n,
-                 version_str,
                  asset_d,
+                 must_exist,
                  localized_resource_obj):
         """
         An object responsible for managing a single pin.
 
         :param pin_n:
                 The name of the pin.
-        :param version_str:
-                The version string this pin references. Only needed when creating a new pin. Ignored otherwise. Pass in
-                the None pointer in those cases.
         :param asset_d:
                 The path to the asset root.
+        :param must_exist:
+                If True, the pin must exist on disk. If it does not exist, an error is raised.
         :param localized_resource_obj:
                 Localization object.
         """
 
         assert type(pin_n) is str
         assert type(asset_d) is str
-        assert os.path.exists(asset_d)
-        assert os.path.isdir(asset_d)
+        assert type(must_exist) is bool
         assert type(localized_resource_obj) is LocalizedResource
 
-        self.pin_n = pin_n.upper()
-        self.asset_d = asset_d
         self.localized_resource_obj = localized_resource_obj
 
+        self.asset_d = asset_d
+        self._validate_asset_d()
+
+        self.pin_n = pin_n.upper()
         self._validate_pin_name(self.pin_n)
 
         self.pin_p = os.path.join(asset_d, pin_n)
         self.attr_pin_p = os.path.join(asset_d, "." + pin_n)
         self.locked_semaphore_p = os.path.join(asset_d, f".{pin_n.upper()}_locked")
 
-        self.version_str = version_str
+        if must_exist:
+            self._validate_pin_exists()
+            self.version_str = self._get_version_str()
+            self.version_int = self._version_int_from_str(self.version_str)
+        else:
+            self.version_str = None
+            self.version_int = None
 
-        if os.path.exists(self.pin_p) and not os.path.islink(self.pin_p):
-            err_msg = self.localized_resource_obj.get_error_msg(11107)
-            err_msg = err_msg.format(pin=pin_n)
-            raise SquirrelError(err_msg, 11107)
+    # ------------------------------------------------------------------------------------------------------------------
+    def exists(self) -> bool:
+        """
+        Returns True if the pin exists on disk, and points to a valid version.
+
+        :return:
+                True if the pin exists on disk.
+        """
+
+        # TODO: Must point to a valid version.
+        return os.path.exists(self.pin_p) and os.path.islink(self.pin_p)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _version_int_from_str(version_str) -> int:
+        """
+        Given a version as a string, return an integer. Does not check whether this value equates to an actual version
+        on disk.
+
+        :param version_str:
+                The version number as a string.
+        """
+
+        assert type(version_str) is str
+
+        result = re.match(pattern=VERSION_PATTERN, string=version_str)
+
+        return int(result.groups()[1])
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _validate_pin_exists(self):
+        """
+        Raises an error if the pin does not exist on disk.
+
+        :return:
+                Nothing.
+        """
+
+        if not self.exists():
+            err_msg = self.localized_resource_obj.get_error_msg(11002)
+            err_msg = err_msg.format(pin=self.pin_n)
+            raise SquirrelError(err_msg, 11002)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _validate_asset_d(self):
+        """
+        Makes sure that the asset directory exists.
+        """
+
+        if not os.path.isdir(self.asset_d):
+            err_msg = self.localized_resource_obj.get_error_msg(11208)
+            err_msg = err_msg.format(asset_dir=self.asset_d)
+            raise SquirrelError(err_msg, 11208)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _validate_pin_name(self,
@@ -67,6 +126,8 @@ class Pin(object):
                 Nothing.
         """
 
+        assert type(pin_n) is str
+
         if pin_n[0] == ".":
             err_msg = self.localized_resource_obj.error(11112)
             err_msg = err_msg.format(pin=pin_n)
@@ -80,6 +141,17 @@ class Pin(object):
         if pin_n.upper().endswith("_LOCKED"):
             err_msg = self.localized_resource_obj.get_error_msg(11111)
             raise SquirrelError(err_msg, 11111)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _get_version_str(self):
+        """
+        If the pin exists, gets the name of the version the pin references. The pin must exist on disk.
+
+        :return:
+                A string representing the name of the version the pin references.
+        """
+
+        return os.path.split(str(Path(self.pin_p).resolve()))[1]
 
     # ------------------------------------------------------------------------------------------------------------------
     def is_locked(self):
@@ -118,11 +190,14 @@ class Pin(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def create_link(self,
+                    version_obj,
                     allow_delete_locked,
                     lock):
         """
         Creates the symlink on disk.
 
+        :param version_obj:
+                The version object we are linking to.
         :param allow_delete_locked:
                 If True, then the previous link may be deleted, even if it is locked. If False, the link may not be
                 deleted if it is locked. Must be set to True in order to UPDATE a locked link.
@@ -134,15 +209,19 @@ class Pin(object):
                 Nothing.
         """
 
+        assert type(version_obj) is Version
+        assert type(allow_delete_locked) is bool
+        assert type(lock) is bool
+
         self.delete_link(allow_delete_locked=allow_delete_locked)
 
-        src = "./" + self.version_str
+        src = "./" + version_obj.version_str
         dst = os.path.join(".", self.asset_d, self.pin_n)
         if os.path.islink(dst):
             os.unlink(dst)
         os.symlink(src, dst)
 
-        src = "./." + self.version_str
+        src = "./." + version_obj.version_str
         dst = os.path.join(".", self.asset_d, "." + self.pin_n)
         if os.path.islink(dst):
             os.unlink(dst)
@@ -164,6 +243,8 @@ class Pin(object):
         :return:
                 Nothing.
         """
+
+        assert type(allow_delete_locked) is bool
 
         if not allow_delete_locked and self.is_locked():
             err_msg = self.localized_resource_obj.get_error_msg(11106)
