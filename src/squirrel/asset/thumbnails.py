@@ -276,16 +276,18 @@ class Thumbnails(object):
         return output
 
     # ------------------------------------------------------------------------------------------------------------------
-    def poster_file(self) -> Union[str, None]:
+    def poster_file(self) -> str:
         """
         Returns a path to the poster file.
 
         :return:
-                A path to the poster file. If no poster frame is found, returns None.
+                A path to the poster file. If no poster frame is found, returns a blank.
         """
 
-        files_p = self.thumbnail_symlink_files()
-        for file_p in files_p:
-            if os.path.splitext(os.path.split(file_p)[1])[0].lower() == "poster":
-                return file_p
-        return None
+        files_n = os.listdir(self.thumbnail_d)
+        for file_n in files_n:
+            if os.path.splitext(file_n)[0].lower() == "poster":
+                link_p = os.path.join(self.thumbnail_d, file_n)
+                if os.path.islink(link_p):
+                    return os.path.join(self.thumbnail_d, link_p)
+        return ""
