@@ -972,25 +972,29 @@ class Asset(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_thumbnails(self,
-                        version_int):
+                        version_int=None):
         """
         Returns a list of all the thumbnail files (with full paths) for the version given.
 
         :param version_int:
-                The version integer for the version from which we want the list of thumbnails.
+                The version integer for the version from which we want the list of thumbnails. If None, then the latest
+                verison will be used. Defaults to None.
 
         :return:
                 A list of thumbnails (including full paths).
         """
 
-        assert type(version_int) is int
+        assert version_int is None or type(version_int) is int
+
+        if version_int is None:
+            version_int = self._get_highest_ver_num()
 
         version_obj = self._version_object(version_int)
         return version_obj.thumbnail_symlink_files()
 
     # ------------------------------------------------------------------------------------------------------------------
     def list_poster(self,
-                    version_int):
+                    version_int=None):
         """
         Returns a path to the thumbnail poster file for the version given.
 
@@ -1000,7 +1004,10 @@ class Asset(object):
         :return:
                 A path to the thumbnail poster file.
         """
-        assert type(version_int) is int
+        assert version_int is None or type(version_int) is int
+
+        if version_int is None:
+            version_int = self._get_highest_ver_num()
 
         version_obj = self._version_object(version_int)
         return version_obj.thumbnail_poster_file()
