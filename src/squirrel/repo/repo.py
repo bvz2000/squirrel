@@ -992,6 +992,29 @@ class Repo(object):
         asset_obj.delete_asset_notes(log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
+    def list_thumbnails(self,
+                        uri,
+                        version_int=None):
+        """
+        Lists thumbnails on the asset defined by the URI and version.
+
+        :param uri:
+                The asset URI.
+        :param version_int:
+                The version number to which the thumbnails should be added. If None, then the latest version will be
+                used. Defaults to None.
+
+        :return:
+                Nothing.
+        """
+
+        assert type(uri) is str
+        assert version_int is None or type(version_int) is int
+
+        asset_obj = self.asset_obj_from_uri(uri)
+        return asset_obj.list_thumbnails(version_int=version_int)
+
+    # ------------------------------------------------------------------------------------------------------------------
     def add_thumbnails(self,
                        uri,
                        thumbnails_p,
