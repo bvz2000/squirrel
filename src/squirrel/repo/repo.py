@@ -445,15 +445,15 @@ class Repo(object):
         return output
 
     # ------------------------------------------------------------------------------------------------------------------
-    def list_asset_objs_from_cache(self,
-                                   uri=None,
-                                   keywords=None,
-                                   metadata_keys=None,
-                                   metadata_key_and_values=None,
-                                   kw_match_use_and=False,
-                                   meta_match_use_and=False):
+    def get_asset_objs_from_cache(self,
+                                  uri=None,
+                                  keywords=None,
+                                  metadata_keys=None,
+                                  metadata_key_and_values=None,
+                                  kw_match_use_and=False,
+                                  meta_match_use_and=False):
         """
-        list all the asset objects in the repo by inspecting the cache (this does not look at the file system).
+        Gets all the asset objects in the repo by inspecting the cache (this does not look at the file system).
 
         Optionally filter on keywords, metadata, and uri_paths. Filters are performed as follows:
 
