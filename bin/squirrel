@@ -27,6 +27,7 @@ from squirrel.shared import constants
 #  - Check to see if we can make versions optional on as many subtasks as possible
 #  - Check to see if we can make multiple URI's a thing so that we can affect multiple assets at once
 #  - Check to see if we can add a wildcard at the end of an asset name in a URI and then disambiguate it
+#  - Check to see if publishing compound assets work
 
 
 # ======================================================================================================================
