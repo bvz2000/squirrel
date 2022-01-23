@@ -12,6 +12,7 @@ import textwrap as textwrap
 from squirrel.repo.repomanager import RepoManager
 from bvzlocalizationerror import LocalizationError
 from bvzlocalization import LocalizedResource
+from bvzframespec import Framespec
 from squirrel.shared.squirrelerror import SquirrelError
 from squirrel.shared import setupconfig
 from squirrel.shared import constants
@@ -216,6 +217,15 @@ def initial_parser_setup(localization_obj):
                                            help=help_str)
     setup_update_repo_caches_parser(sub_parser=sub_parser_obj,
                                     localization_obj=localization_obj)
+
+    # list-cache-path -------------------------------------
+    help_str = localization_obj.get_msg("list_cache_path_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="list-cache-path",
+                                           aliases=['lcp'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_list_cache_path_parser(sub_parser=sub_parser_obj,
+                                 localization_obj=localization_obj)
 
     # list-assets -------------------------------------
     help_str = localization_obj.get_msg("list_assets_subtask_help")
@@ -818,8 +828,38 @@ def setup_update_repo_caches_parser(sub_parser,
                             required=False,
                             help=help_str)
 
+    help_str = localization_obj.get_msg("update_repo_caches_optional_all")
+    sub_parser.add_argument("-a",
+                            "--all-repos",
+                            action="store_true",
+                            help=help_str)
+
     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
                                     localization_obj=localization_obj)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_list_cache_path_parser(sub_parser,
+                                 localization_obj):
+    """
+    Sets up the list cache path sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("postfix_config_path_helpstr")
+    help_str = help_str.format(env=constants.CONFIG_PATH_ENV_VAR)
+    sub_parser.add_argument("-c",
+                            metavar="config-file",
+                            dest="config_path",
+                            type=str,
+                            help=help_str)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1808,44 +1848,6 @@ def setup_collapse_parser(sub_parser,
 #
 #
 # # ----------------------------------------------------------------------------------------------------------------------
-# def setup_append_log_parser(sub_parser,
-#                             localization_obj,
-#                             name_required=True,
-#                             asset_parent_path_required=True):
-#     """
-#     Sets up the append log arguments sub-parser.
-#
-#     :param sub_parser:
-#             The sub-parser object to which we will add options.
-#     :param localization_obj:
-#             The localization object that contains all of the help strings in the appropriate language
-#     :param name_required:
-#             If True, then the asset name is a required argument.
-#     :param asset_parent_path_required:
-#             If True, then the asset parent path is a required argument.
-#
-#     :return:
-#             Nothing
-#     """
-#
-#     setup_shared_sub_parser_prefix(sub_parser=sub_parser,
-#                                    localization_obj=localization_obj,
-#                                    name_required=name_required,
-#                                    asset_parent_path_required=asset_parent_path_required)
-#
-#     help_str = localization_obj.get_msg("append_log_required_text_helpstr")
-#     sub_parser.add_argument("-t",
-#                             "--text",
-#                             nargs="+",
-#                             type=str,
-#                             required=True,
-#                             help=help_str)
-#
-#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
-#                                     localization_obj=localization_obj)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
 # def setup_display_log_parser(sub_parser,
 #                              localization_obj,
 #                              name_required=True,
@@ -1873,74 +1875,7 @@ def setup_collapse_parser(sub_parser,
 #
 #     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
 #                                     localization_obj=localization_obj)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def setup_delete_version_parser(sub_parser,
-#                                 localization_obj,
-#                                 name_required=True,
-#                                 asset_parent_path_required=True):
-#     """
-#     Sets up the delete version arguments sub-parser.
-#
-#     :param sub_parser:
-#             The sub-parser object to which we will add options.
-#     :param localization_obj:
-#             The localization object that contains all of the help strings in the appropriate language
-#     :param name_required:
-#             If True, then the asset name is a required argument.
-#     :param asset_parent_path_required:
-#             If True, then the asset parent path is a required argument.
-#
-#     :return:
-#             Nothing
-#     """
-#
-#     setup_shared_sub_parser_prefix(sub_parser=sub_parser,
-#                                    localization_obj=localization_obj,
-#                                    name_required=name_required,
-#                                    asset_parent_path_required=asset_parent_path_required)
-#
-#     help_str = localization_obj.get_msg("delete_version_version_helpstr")
-#     sub_parser.add_argument("-v",
-#                             "--versions",
-#                             type=str,
-#                             nargs="+",
-#                             required=True,
-#                             help=help_str)
-#
-#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
-#                                     localization_obj=localization_obj)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def setup_collapse_asset_parser(sub_parser,
-#                                 localization_obj,
-#                                 name_required=True,
-#                                 asset_parent_path_required=True):
-#     """
-#     Sets up the delete version arguments sub-parser.
-#
-#     :param sub_parser:
-#             The sub-parser object to which we will add options.
-#     :param localization_obj:
-#             The localization object that contains all of the help strings in the appropriate language
-#     :param name_required:
-#             If True, then the asset name is a required argument.
-#     :param asset_parent_path_required:
-#             If True, then the asset parent path is a required argument.
-#
-#     :return:
-#             Nothing
-#     """
-#
-#     setup_shared_sub_parser_prefix(sub_parser=sub_parser,
-#                                    localization_obj=localization_obj,
-#                                    name_required=name_required,
-#                                    asset_parent_path_required=asset_parent_path_required)
-#
-#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
-#                                     localization_obj=localization_obj)
+
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -2259,8 +2194,7 @@ def subtask_set_default_repo(args,
 
 # ----------------------------------------------------------------------------------------------------------------------
 def subtask_update_repo_caches(args,
-                               repo_manager_obj,
-                               localization_obj):
+                               repo_manager_obj):
     """
     Updates the repo cache.
 
@@ -2268,34 +2202,50 @@ def subtask_update_repo_caches(args,
             The parsed arguments object.
     :param repo_manager_obj:
             A repo manager object.
-    :param localization_obj:
-            The localization object for error messages and the like.
 
     :return:
             Nothing.
     """
 
-    try:
-        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
-                                                repo_required=False,
-                                                path_required=False,
-                                                name_required=False)
+    if args.all_repos:
 
-        cache_p = repo_manager_obj.cache_p
-        repo_n = uri.split(":/")[0]
-        notification_str = localization_obj.get_msg("begin_update_repo_caches").format(repo_name=repo_n,
-                                                                                       cache_path=cache_p)
-        print(notification_str)
-        repo_manager_obj.build_cache_for_repo(uri=uri)
-    except SquirrelError as e:
-        print(f"({e.code}) {e.message}")
-        sys.exit(e.code)
-    except LocalizationError as e:
-        print(f"({e.code}) {e.message}")
-        sys.exit(e.code)
+        try:
+            repo_manager_obj.cache_all_repos()
+        except SquirrelError as e:
+            print(f"({e.code}) {e.message}")
+            sys.exit(e.code)
 
-    success_str = localization_obj.get_msg("success_update_repo_caches").format(repo_name=repo_n)
-    print(success_str)
+    else:
+
+        try:
+            uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                    repo_required=True,
+                                                    path_required=False,
+                                                    name_required=False)
+            repo_manager_obj.cache_repo(uri=uri)
+        except SquirrelError as e:
+            print(f"({e.code}) {e.message}")
+            sys.exit(e.code)
+        except LocalizationError as e:
+            print(f"({e.code}) {e.message}")
+            sys.exit(e.code)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_list_cache_path(repo_manager_obj):
+    """
+    Updates the repo cache.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    print(repo_manager_obj.cache_obj.cache_p)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -2316,6 +2266,8 @@ def print_heading(char,
     headings["V"] = "LATEST VER"
     headings["P"] = "PINS"
     headings["N"] = "NOTES"
+    headings["t"] = "THUMBNAILS"
+    headings["O"] = "POSTER"
 
     print("  | ", end="")
     print(headings[char].ljust(max_lengths[char], " "), end="")
@@ -2360,7 +2312,7 @@ def print_asset_data(asset_obj,
         print(uri_path.ljust(max_lengths[char], " "), end="")
 
     if char == "k":
-        keywords = asset_obj.list_keywords_from_cache()
+        keywords = asset_obj.list_keywords()
         keywords.sort()
         print("  | ", end="")
         print(" ".join(keywords).ljust(max_lengths[char], " "), end="")
@@ -2390,6 +2342,16 @@ def print_asset_data(asset_obj,
     if char == "N":
         print("  | ", end="")
         print(asset_obj.list_asset_notes().replace("\n", " - ").ljust(max_lengths[char]), end="")
+
+    if char == "t":
+        print("  | ", end="")
+        framespec = Framespec()
+        framespec.files = asset_obj.list_thumbnails()
+        print(framespec.framespec_str.ljust(max_lengths[char]), end="")
+
+    if char == "O":
+        print("  | ", end="")
+        print(asset_obj.list_poster().ljust(max_lengths[char]), end="")
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -2426,7 +2388,7 @@ def subtask_list_assets(args,
         args.format = fields_format
 
     for char in args.format:
-        if char not in "npuUkmNtvVP":
+        if char not in "npuUkmNtvVPO":
             err_msg = localization_obj.get_error_msg(1)
             err_msg = err_msg.format(char=char)
             print(err_msg)
@@ -2476,12 +2438,12 @@ def subtask_list_assets(args,
                                                     name_required=False)
 
             repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-            asset_objs.extend(repo_obj.list_asset_objs_from_cache(uri=uri,
-                                                                  keywords=args.keywords,
-                                                                  metadata_keys=args.metadata_keys,
-                                                                  metadata_key_and_values=metadata_keys_and_values,
-                                                                  kw_match_use_and=args.keywords_and,
-                                                                  meta_match_use_and=args.metadata_and))
+            asset_objs.extend(repo_obj.get_asset_objs_from_cache(uri=uri,
+                                                                 keywords=args.keywords,
+                                                                 metadata_keys=args.metadata_keys,
+                                                                 metadata_key_and_values=metadata_keys_and_values,
+                                                                 kw_match_use_and=args.keywords_and,
+                                                                 meta_match_use_and=args.metadata_and))
 
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
@@ -2502,6 +2464,8 @@ def subtask_list_assets(args,
     max_lengths["V"] = 10
     max_lengths["P"] = 4
     max_lengths["N"] = 5
+    max_lengths["t"] = 10
+    max_lengths["O"] = 6
 
     asset_count = len(asset_objs)
     curr_asset = 1
@@ -2514,13 +2478,17 @@ def subtask_list_assets(args,
         max_lengths["p"] = max(max_lengths["p"], len(asset_obj.asset_d))
         max_lengths["u"] = max(max_lengths["u"], len(repo_manager_obj.uri_from_asset_path(asset_obj.asset_d)))
         max_lengths["U"] = max(max_lengths["U"], len(repo_manager_obj.uri_path_from_asset_path(asset_obj.asset_d)))
-        max_lengths["k"] = max(max_lengths["k"], len(" ".join(asset_obj.list_keywords_from_cache())))
+        max_lengths["k"] = max(max_lengths["k"], len(" ".join(asset_obj.list_keywords())))
         metadata = [f"{k}={v}" for k, v in asset_obj.list_key_value_pairs().items()]
         max_lengths["m"] = max(max_lengths["m"], len(" ".join(metadata)))
         max_lengths["v"] = max(max_lengths["v"], len(" ".join(asset_obj.list_versions())))
         max_lengths["V"] = max(max_lengths["V"], len(asset_obj.list_latest_version()))
         max_lengths["P"] = max(max_lengths["P"], len(" ".join(asset_obj.list_pins())))
         max_lengths["N"] = max(max_lengths["N"], len(asset_obj.list_asset_notes().replace("\n", " - ")))
+        max_lengths["O"] = max(max_lengths["N"], len(asset_obj.list_poster()))
+        framespec = Framespec()
+        framespec.files = asset_obj.list_thumbnails()
+        max_lengths["t"] = max(max_lengths["t"], len(framespec.framespec_str))
     print("\n\n")
 
     for char in args.format:
@@ -3568,8 +3536,11 @@ def run_sub_task(args,
 
         if args.sub_task.upper() in ["UPDATE-REPO-CACHES", "URC"]:
             subtask_update_repo_caches(args=args,
-                                       repo_manager_obj=repo_manager_obj,
-                                       localization_obj=localization_obj)
+                                       repo_manager_obj=repo_manager_obj)
+            return
+
+        if args.sub_task.upper() in ["LIST-CACHE-PATH", "LCP"]:
+            subtask_list_cache_path(repo_manager_obj=repo_manager_obj)
             return
 
         if args.sub_task.upper() in ["LIST-ASSETS", "LA"]:
