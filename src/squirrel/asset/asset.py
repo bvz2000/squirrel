@@ -978,7 +978,7 @@ class Asset(object):
 
         :param version_int:
                 The version integer for the version from which we want the list of thumbnails. If None, then the latest
-                verison will be used. Defaults to None.
+                version will be used. Defaults to None.
 
         :return:
                 A list of thumbnails (including full paths).
