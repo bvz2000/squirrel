@@ -17,14 +17,23 @@ from squirrel.shared.squirrelerror import SquirrelError
 from squirrel.shared import setupconfig
 from squirrel.shared import constants
 
-# TODO: Add verification to any delete commands (as a separate function)
+# TODO:
+#   -    Add verification to any delete commands (as a separate function)
+#   -    Double check the uri requirements (repo_required
+#                                           path_required
+#                                           name_required
+#                                           name_must_exist) on each of the subtasks
+#   -    Double check the help strings to make sure they correctly reflect these requirements
+#   -    Check to see if we can make versions optional on as many subtasks as possible
+#   -    Check to see if we can make multiple URI's a thing so that we can affect multiple assets at once
+#   -    Check to see if we can add a wildcard at the end of an asset name in a URI and then disambiguate it
 
 
 # ======================================================================================================================
 class PreserveWhiteSpaceWrapRawTextHelpFormatter(RawTextHelpFormatter):
 
     def _split_lines(self, text, width):
-        text_rows = text.splitlines()
+        text_rows = list(text.splitlines())  # List() needed to shut pycharm up.
         for idx, line in enumerate(text_rows):
             search = re.search(r'\s*[0-9\-]{0,}\.?\s*', line)
             if line.strip() is "":
@@ -112,11 +121,6 @@ def initial_parser_setup(localization_obj):
     :return:
             The parsed args.
     """
-
-    # TODO: Add or fix the following functions:
-    #  fix: list thumbnails,
-    #  add: quick publish (no need for a uri because the full uri is embedded in the name (minus the repo)
-    #  display log
 
     parser = ArgumentParser(formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter)
 
@@ -451,38 +455,14 @@ def initial_parser_setup(localization_obj):
     setup_collapse_parser(sub_parser=sub_parser_obj,
                           localization_obj=localization_obj)
 
-    # # add-log
-    # help_str = localization_obj.get_msg("append_log_help")
-    # append_log_parser = sub_parser.add_parser(name="append-log",
-    #                                           aliases=['al'],
-    #                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
-    #                                           help=help_str)
-    # setup_append_log_parser(sub_parser=append_log_parser,
-    #                         localization_obj=localization_obj,
-    #                         name_required=asset_name_required,
-    #                         asset_parent_path_required=asset_parent_path_required)
-    #
-    # # display-log
-    # help_str = localization_obj.get_msg("display_log_help")
-    # display_log_parser = sub_parser.add_parser(name="display-log",
-    #                                            aliases=['dl'],
-    #                                            formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
-    #                                            help=help_str)
-    # setup_display_log_parser(sub_parser=display_log_parser,
-    #                          localization_obj=localization_obj,
-    #                          name_required=asset_name_required,
-    #                          asset_parent_path_required=asset_parent_path_required)
-    #
-    # # delete-version
-    # help_str = localization_obj.get_msg("delete_version_help")
-    # delete_version_parser = sub_parser.add_parser(name="delete-version",
-    #                                               aliases=['dv'],
-    #                                               formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
-    #                                               help=help_str)
-    # setup_delete_version_parser(sub_parser=delete_version_parser,
-    #                             localization_obj=localization_obj,
-    #                             name_required=asset_name_required,
-    #                             asset_parent_path_required=asset_parent_path_required)
+    # display-log -----------------------------------------
+    help_str = localization_obj.get_msg("display_log_subtask_help")
+    sub_parser_obj = sub_parser.add_parser(name="display-log",
+                                           aliases=['dl'],
+                                           formatter_class=PreserveWhiteSpaceWrapRawTextHelpFormatter,
+                                           help=help_str)
+    setup_display_log_parser(sub_parser=sub_parser_obj,
+                             localization_obj=localization_obj)
 
     help_str = localization_obj.get_msg("postfix_language_helpstr")
     parser.add_argument("-l",
@@ -1836,89 +1816,33 @@ def setup_collapse_parser(sub_parser,
     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
                                     localization_obj=localization_obj)
 
-# # ----------------------------------------------------------------------------------------------------------------------
-# def setup_quickstore_parser(sub_parser,
-#                             localization_obj,
-#                             config_obj):
-#     """
-#     Sets up the quickstore arguments sub-parser.
-#
-#     :param sub_parser:
-#             The sub-parser object to which we will add options.
-#     :param localization_obj:
-#             The localization object that contains all of the help strings in the appropriate language
-#     :param config_obj:
-#             The config object responsible for reading the config file.
-#
-#     :return:
-#             Nothing
-#     """
-#
-#     help_str = localization_obj.get_msg("quickstore_asset_name_helpstr")
-#     sub_parser.add_argument("-n",
-#                             "--name",
-#                             type=str,
-#                             required=False,
-#                             default=None,
-#                             help=help_str)
-#
-#     help_str = localization_obj.get_msg("store_optional_merge_helpstr")
-#     sub_parser.add_argument("-m",
-#                             "--do-not-merge",
-#                             action="store_true",
-#                             help=help_str)
-#
-#     help_str = localization_obj.get_msg("optional_ignore_file_count_limit_helpstr")
-#     help_str = help_str.format(limit=config_obj.get_item("preferences", "file_count_warning"))
-#     sub_parser.add_argument("-I",
-#                             "--ignore-file-count-limit",
-#                             action="store_true",
-#                             help=help_str)
-#
-#     help_str = localization_obj.get_msg("store_optional_verify_copy_helpstr")
-#     sub_parser.add_argument("-v",
-#                             "--verify-copy",
-#                             action="store_true",
-#                             help=help_str)
-#
-#     help_str = localization_obj.get_msg("store_optional_verbose_helpstr")
-#     sub_parser.add_argument("-V",
-#                             "--verbose",
-#                             action="store_true",
-#                             help=help_str)
-#
-#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
-#                                     localization_obj=localization_obj)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def setup_display_log_parser(sub_parser,
-#                              localization_obj,
-#                              name_required=True,
-#                              asset_parent_path_required=True):
-#     """
-#     Sets up the display notes arguments sub-parser.
-#
-#     :param sub_parser:
-#             The sub-parser object to which we will add options.
-#     :param localization_obj:
-#             The localization object that contains all of the help strings in the appropriate language
-#     :param name_required:
-#             If True, then the asset name is a required argument.
-#     :param asset_parent_path_required:
-#             If True, then the asset parent path is a required argument.
-#
-#     :return:
-#             Nothing
-#     """
-#
-#     setup_shared_sub_parser_prefix(sub_parser=sub_parser,
-#                                    localization_obj=localization_obj,
-#                                    name_required=name_required,
-#                                    asset_parent_path_required=asset_parent_path_required)
-#
-#     setup_shared_sub_parser_postfix(sub_parser=sub_parser,
-#                                     localization_obj=localization_obj)
+
+# ----------------------------------------------------------------------------------------------------------------------
+def setup_display_log_parser(sub_parser,
+                             localization_obj):
+    """
+    Sets up the display log sub-parser.
+
+    :param sub_parser:
+            The sub-parser object to which we will add options.
+    :param localization_obj:
+            The localization object that contains all of the help strings in the appropriate language
+
+    :return:
+            Nothing
+    """
+
+    help_str = localization_obj.get_msg("display_log_uri_path_required_helpstr")
+    sub_parser.add_argument("-u",
+                            metavar="uri",
+                            dest="uri",
+                            type=str,
+                            required=True,
+                            default=None,
+                            help=help_str)
+
+    setup_shared_sub_parser_postfix(sub_parser=sub_parser,
+                                    localization_obj=localization_obj)
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -2757,8 +2681,6 @@ def subtask_add_metadata(args,
             Nothing.
     """
 
-    # TODO: Change this (and add-keywords and add-notes) to accept more ambiguous uri's so that we can add to multiple
-    #  assets at the same time.
     try:
         for user_uri in args.uri:
             uri = repo_manager_obj.disambiguate_uri(uri=user_uri,
@@ -3431,80 +3353,35 @@ def subtask_collapse(args,
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_quick_store(args,
-#                         localization_obj):
-#     """
-#     Store the asset.
-#
-#     :param args:
-#             The parsed arguments object.
-#     :param localization_obj:
-#             The localization object for error messages and the like.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset_parent_path = os.environ[DEFAULT_ASSET_PATH_ENV]
-#     except KeyError:
-#         err_msg = localization_obj.get_error_msg(120)
-#         err_msg = err_msg.format(env=DEFAULT_ASSET_PATH_ENV)
-#         print(err_msg)
-#         sys.exit(120)
-#
-#     if not os.path.exists(asset_parent_path):
-#         err_msg = localization_obj.get_error_msg(121)
-#         err_msg = err_msg.format(env=DEFAULT_ASSET_PATH_ENV, path=asset_parent_path)
-#         print(err_msg)
-#         sys.exit(121)
-#
-#     if not os.path.isdir(asset_parent_path):
-#         err_msg = localization_obj.get_error_msg(122)
-#         err_msg = err_msg.format(env=DEFAULT_ASSET_PATH_ENV, path=asset_parent_path)
-#         print(err_msg)
-#         sys.exit(122)
-#
-#     if args.name is None:
-#         args.name = os.path.split(os.getcwd())[1]
-#
-#     args.skip_symlinks = False
-#     args.follow_external_symlinks = False
-#
-#     src_p = os.getcwd()
-#
-#     subtask_store(args, localization_obj, asset_parent_path, src_p)
-#
-#
-# # ----------------------------------------------------------------------------------------------------------------------
-# def subtask_display_log(args):
-#     """
-#     Displays the log.
-#
-#     :param args:
-#             The parsed arguments object.
-#
-#     :return:
-#             Nothing.
-#     """
-#
-#     try:
-#         asset = Asset(asset_parent_d=args.directory,
-#                       name=args.name,
-#                       config_p=args.config_path)
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     try:
-#         text = asset.display_log()
-#     except AssetError as e:
-#         print(f"({e.code}) {e.message}")
-#         sys.exit(e.code)
-#
-#     print(text)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def subtask_display_log(args,
+                        repo_manager_obj):
+    """
+    Displays an asset's log.
+
+    :param args:
+            The parsed arguments object.
+    :param repo_manager_obj:
+            A repo manager object.
+
+    :return:
+            Nothing.
+    """
+
+    try:
+        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
+                                                repo_required=False,
+                                                path_required=False,
+                                                name_required=True,
+                                                name_must_exist=True)
+        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+        lines = repo_obj.display_log(uri=uri)
+        print(lines)
+    except SquirrelError as e:
+        print(f"({e.code}) {e.message}")
+        sys.exit(e.code)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -3528,14 +3405,6 @@ def validate_args(args,
             err_msg = err_msg.format(config=args.config_path)
             print(err_msg)
             sys.exit(503)
-
-    # TODO: This probably is no longer relevant and can be stripped out...
-    try:
-        if args.directory is None:
-            args.directory = os.path.split(os.getcwd())[0]
-            args.repo_name = os.path.split(os.getcwd())[1]
-    except AttributeError:  # Some of the sub-tasks do not have the args.directory option
-        pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -3762,6 +3631,11 @@ def run_sub_task(args,
                              repo_manager_obj=repo_manager_obj,
                              localization_obj=localization_obj,
                              log_str=log_str)
+            return
+
+        if args.sub_task.upper() in ["DISPLAY-LOG", "DL"]:
+            subtask_display_log(args=args,
+                                repo_manager_obj=repo_manager_obj)
             return
 
     except SquirrelError as e:

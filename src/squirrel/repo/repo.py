@@ -1364,6 +1364,24 @@ class Repo(object):
         asset_obj.collapse(log_str=log_str)
 
     # ------------------------------------------------------------------------------------------------------------------
+    def display_log(self,
+                    uri):
+        """
+        Lists thumbnails on the asset defined by the URI and version.
+
+        :param uri:
+                The asset URI.
+
+        :return:
+                Nothing.
+        """
+
+        assert type(uri) is str
+
+        asset_obj = self.asset_obj_from_uri(uri)
+        return asset_obj.display_log()
+
+    # ------------------------------------------------------------------------------------------------------------------
     def _get_publish_path(self,
                           uri_path):
         """
