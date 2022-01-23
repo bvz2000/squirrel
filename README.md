@@ -28,7 +28,7 @@ that runs under Linux and MacOS. At the moment, it does not run under
 Windows, though this is planned for a future release. It was developed on a
 Linux CentOS 7 system running Python 3.7.11.
 
-# NOTE: Squirrel is in pre-alpha and does not fully work yet.
+# NOTE: Squirrel is in late alpha stage. The majority of its functions are complete, though there are features planned for future releases that have not yet been implemented. I am hoping to have a beta release available by mid Feb, 2022.
 
 Features that will be part of the 1.0 release:
 --------------------------------------------------------------------------------
