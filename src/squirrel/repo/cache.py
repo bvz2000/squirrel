@@ -578,7 +578,7 @@ class Cache(object):
         asset_id = self.cursor.execute(sql, (last_row_id,)).fetchone()[0]
         self.connection.commit()
 
-        for keyword in asset_obj.list_keywords_from_cache():
+        for keyword in asset_obj.list_keywords():
             self._cache_keyword_by_asset_id(keyword=keyword,
                                             asset_id=asset_id)
 
@@ -606,7 +606,7 @@ class Cache(object):
                 Nothing.
         """
 
-        self._flush_repo_from_cache(repo_obj)
+        self._flush_repo_from_cache(repo_obj.repo_n)
 
         asset_objs = repo_obj.list_asset_objs_from_filesystem()
         for asset_obj in asset_objs:
@@ -1070,7 +1070,6 @@ class Cache(object):
         for key, comparison_type, value in metadata:
 
             key = key.upper()
-            value = value.upper()
 
             if comparison_type in ["<", ">", ">=", "<="]:
                 where_str = "(metadata.metadata_key = ? AND metadata.metadata_num_value {comparison_type} ?)"
@@ -1123,7 +1122,6 @@ class Cache(object):
         for key, comparison_type, value in metadata:
 
             key = key.upper()
-            value = value.upper()
 
             if comparison_type in ["<", ">", ">=", "<="]:
                 where_str = "metadata.metadata_key = ? AND metadata.metadata_num_value {comparison_type} ?"
