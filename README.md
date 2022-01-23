@@ -46,7 +46,6 @@ Features that will be part of the 1.0 release:
 - storage of (deduplicated) thumbnails and turntables for each check-in of each asset.
 - no external dependencies other than Python and a series of python libraries (also developed by me)
 - ready to be localized into other languages.
-- a metric ton of bugs no doubt!!!!!!!
 
 Missing features planned for 1.1 release:
 --------------------------------------------------------------------------------
