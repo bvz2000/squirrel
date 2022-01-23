@@ -54,12 +54,12 @@ class RepoManager(object):
         self.repos = dict()
         self.default_repo = None
 
-        self._load_repos_from_repos_list()
-        self._load_default_repo()
-
         self.cache_obj = Cache(config_obj=self.config_obj,
                                localized_resource_obj=self.localized_resource_obj)
         self.cache_obj.cache_if_needed(self.repos.values())
+
+        self._load_repos_from_repos_list()
+        self._load_default_repo()
 
     # ------------------------------------------------------------------------------------------------------------------
     def disambiguate_uri(self,
@@ -608,3 +608,31 @@ class RepoManager(object):
             raise SquirrelError(err_msg, 102)
 
         self.default_repo = self.repos[repo_n].repo_n
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def cache_repo(self,
+                   uri):
+        """
+        Given a URI, build a cache for that repo.
+
+        :param uri:
+                The uri that contains the repo name.
+
+        :return:
+                Nothing.
+        """
+
+        repo_n = urilib.repo_name_from_uri(uri)
+        repo_obj = self.repos[repo_n]
+        self.cache_obj.cache_repo(repo_obj=repo_obj)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def cache_all_repos(self):
+        """
+        Cache all repos.
+
+        :return:
+                Nothing.
+        """
+
+        self.cache_obj.cache_all_repos(self.repos.values())
