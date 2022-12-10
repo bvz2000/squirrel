@@ -62,12 +62,33 @@ class RepoManager(object):
         self._load_default_repo()
 
     # ------------------------------------------------------------------------------------------------------------------
+    def default_repo(self):
+        """
+        Returns the default repo. Raises an error if there is no vailid default repo.
+
+        :return:
+                Nothing.
+        """
+
+        if self.default_repo is None:
+            err_msg = self.localized_resource_obj.get_error_msg(203)
+            raise SquirrelError(err_msg, 203)
+
+        repo_n = self.default_repo.repo_n
+
+        if repo_n not in self.repos.keys():
+            err_msg = self.localized_resource_obj.get_error_msg(910)
+            err_msg = err_msg.format(name=repo_n)
+            raise SquirrelError(err_msg, 910)
+
+        return repo_n + ":/#"
+
+    # ------------------------------------------------------------------------------------------------------------------
     def disambiguate_uri(self,
                          uri,
                          repo_required=False,
                          path_required=False,
-                         name_required=False,
-                         name_must_exist=True):
+                         name_required=False) -> list:
         """
         Given a partial uri, try to create a full, legal, existing uri (this includes the asset name). The format of a
         full URI is as follows:
@@ -92,10 +113,11 @@ class RepoManager(object):
               the middle of a path. They must always begin at the root of the URI path.
            If none of these are the case, then an error is raised.
         4) If there is no / (not including the :/ listed above) then it is assumed that the partial uri is an asset
-           name only without a path. An attempt will be made to find that asset name. If it does not exist, or exists
-           more than once, an error is raised.
-        5) If any of the above rules result in more than one asset being returned, or no assets being returned, an
-           error is raised.
+           name only without a path. An attempt will be made to find that asset name. If it does not exist an error is
+           raised.
+        5) If any of the above rules result in no assets being returned, an empty list is returned.
+        6) At least one of repo_required, path_required, or name_required must be true or an assertion error will be
+           raised.
 
         Examples:
 
@@ -118,62 +140,69 @@ class RepoManager(object):
                 If true, then a path is required (may be a partial path). Defaults to False.
         :param name_required:
                 If True, then the asset name is a required part of the URI. Defaults to False.
-        :param name_must_exist:
-                If True, then the name (if provided) must exist as an existing asset on disk.
 
         :return:
                 A three item tuple consisting of the repo, path, and asset name. If any of those are missing and not
                 required, that particular item will be set to "".
         """
 
-        # TODO: Split this up into smaller functions
-        # If they supplied just a blank string (or None), return just the default repo.
+        assert repo_required or path_required or name_required
+
+        # TODO: Handle partial names. How do I do that? Probably with a flag instead of a wildcard.
+        # If they supplied just a blank string (or None), raise an error.
         if not uri:
-
-            if repo_required or path_required or name_required:
-                required = list()
-                if repo_required:
-                    required.append("repo name")
-                if path_required:
-                    required.append("URI path")
-                if name_required:
-                    required.append("asset name")
-                required_str = ", ".join(required)
-                required_str = ",and ".join(required_str.rsplit(", ", 1))
-                err_msg = self.localized_resource_obj.get_error_msg(901)
-                err_msg = err_msg.format(required=required_str)
-                raise SquirrelError(err_msg, 901)
-
-            if self.default_repo is None:
-                err_msg = self.localized_resource_obj.get_error_msg(203)
-                raise SquirrelError(err_msg, 203)
-
-            repo_n = self.default_repo.repo_n
-
-            if repo_n not in self.repos.keys():
-                err_msg = self.localized_resource_obj.get_error_msg(910)
-                err_msg = err_msg.format(name=repo_n)
-                raise SquirrelError(err_msg, 910)
-
-            return repo_n + ":/#"
+            err_msg = self.localized_resource_obj.get_error_msg(915)
+            raise SquirrelError(err_msg, 915)
+            #
+            # # If any of the sections was required, raise an error.
+            # if repo_required or path_required or name_required:
+            #     required = list()
+            #     if repo_required:
+            #         required.append("repo name")
+            #     if path_required:
+            #         required.append("URI path")
+            #     if name_required:
+            #         required.append("asset name")
+            #     required_str = ", ".join(required)
+            #     required_str = ",and ".join(required_str.rsplit(", ", 1))
+            #     err_msg = self.localized_resource_obj.get_error_msg(901)
+            #     err_msg = err_msg.format(required=required_str)
+            #     raise SquirrelError(err_msg, 901)
+            #
+            # # If there is no default repo, raise an error.
+            # if self.default_repo is None:
+            #     err_msg = self.localized_resource_obj.get_error_msg(203)
+            #     raise SquirrelError(err_msg, 203)
+            #
+            # # If we get this far, set the repo to be the default repo.
+            # repo_n = self.default_repo.repo_n
+            #
+            # # If this repo is not a valid repo, raise an error.
+            # if repo_n not in self.repos.keys():
+            #     err_msg = self.localized_resource_obj.get_error_msg(910)
+            #     err_msg = err_msg.format(name=repo_n)
+            #     raise SquirrelError(err_msg, 910)
+            #
+            # return repo_n + ":/#"
 
         # Split up the string into a repo and the remaining text.
         try:
             repo_n, remaining_str = uri.split(":/", maxsplit=1)
-        except ValueError:  # There is no repo name
+        except ValueError:  # There is no repo name, so the whole text is either a path, path + name, or name
             repo_n = ""
             remaining_str = uri
 
         # Split up the remaining_str into the path and the asset name.
         try:
             uri_path, asset_n = remaining_str.split("#", maxsplit=1)
-        except ValueError:
-            if "/" in remaining_str:
+        except ValueError:  # There either no name (just a path) or just a name (and no path)
+            if "/" in remaining_str:  # It is a path (and no name)
                 uri_path = remaining_str
                 asset_n = ""
-            else:
+            else:  # It is a name (and no path)
                 uri_path = ""
                 asset_n = remaining_str
+
         # If there is no repo name, but one was required, raise an error
         if repo_required and not repo_n:
             err_msg = self.localized_resource_obj.get_error_msg(902)
@@ -199,17 +228,29 @@ class RepoManager(object):
             err_msg = err_msg.format(repo_name=repo_n)
             raise SquirrelError(err_msg, 102)
 
-        # If there is a uri_path, validate it
-        if uri_path:
-            self.cache_obj.validate_uri_path_against_cache(repo_n=repo_n,
-                                                           uri_path=uri_path)
+        # Get a list of all of the URI's that match the given uri_path
+        if uri_path and not asset_n:
+            asset_ids = self.cache_obj.asset_ids_from_uri_path(repo_n=repo_n,
+                                                               uri_path=uri_path)
+        elif not uri_path and asset_n:
+            asset_ids = self.cache_obj.asset_ids_from_asset_name(repo_n=repo_n,
+                                                                 asset_n=asset_n)
+        elif uri_path and asset_n:
+            asset_ids_from_uri_path = self.cache_obj.asset_ids_from_uri_path(repo_n=repo_n,
+                                                                             uri_path=uri_path)
+            asset_ids_from_asset_name = self.cache_obj.asset_ids_from_asset_name(repo_n=repo_n,
+                                                                                 asset_n=asset_n)
+            asset_ids = list(set(asset_ids_from_asset_name) & set(asset_ids_from_asset_name))
+        else:
+            # TODO: Get a list of all the assets in the repo I guess.
+            asset_ids = list()
+            pass
 
-        # If there is an asset name, validate it
-        if asset_n and name_must_exist:
-            uri_path = self.cache_obj.uri_path_from_asset_name(repo_n=repo_n,
-                                                               asset_n=asset_n)
+        # Get the URI's that match these asset_ids
+        uris = self.cache_obj.uris_from_asset_ids(asset_ids)
 
-        return f"{repo_n}:/{uri_path}#{asset_n}"
+        # Return a list of possible URI's
+        return uris
 
     # ------------------------------------------------------------------------------------------------------------------
     def uri_from_asset_path(self,

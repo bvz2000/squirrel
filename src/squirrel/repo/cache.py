@@ -666,11 +666,12 @@ class Cache(object):
                 return
 
     # ------------------------------------------------------------------------------------------------------------------
-    def validate_uri_path_against_cache(self,
-                                        repo_n,
-                                        uri_path):
+    def asset_ids_from_uri_path(self,
+                                repo_n,
+                                uri_path):
         """
-        Given a uri_path, validate it against the cache. If it is not valid, raise an error.
+        Given a (potentially partial) uri_path, Return a list of all URI's that match. These URI's will also include
+        asset names.
 
         :param repo_n:
                 The repo name.
@@ -681,20 +682,22 @@ class Cache(object):
                 Nothing.
         """
 
-        sql = self.sql_resources.get("disambiguate_uri", "uri_path_exists")
-        rows = self.cursor.execute(sql, (repo_n, uri_path + "%")).fetchall()
-        if len(rows) == 0:
+        sql = self.sql_resources.get("disambiguate_uri", "asset_id_from_uri_path")
+        asset_ids = self.cursor.execute(sql, (repo_n, uri_path + "%")).fetchall()
+        if len(asset_ids) == 0:
             err_msg = self.localized_resource_obj.get_error_msg(907)
             err_msg = err_msg.format(uri_path=uri_path)
             raise SquirrelError(err_msg, 907)
 
+        return asset_ids  # TODO: Check to make sure we actually want to just return rows
+
     # ------------------------------------------------------------------------------------------------------------------
-    def uri_path_from_asset_name(self,
-                                 repo_n,
-                                 asset_n):
+    def asset_ids_from_asset_name(self,
+                                  repo_n,
+                                  asset_n):
         """
-        Given a uri_path, validate it against the cache. If it is not valid, raise an error. If it is valid, return the
-        uri_path.
+        Given an asset name, validate it against the cache. If it is not valid, raise an error. If it is valid, return
+        the asset_id's that match that name.
 
         :param repo_n:
                 The repo name.
@@ -714,11 +717,11 @@ class Cache(object):
             err_msg = err_msg.format(repo_n=repo_n, asset_n=asset_n)
             raise SquirrelError(err_msg, 905)
 
-        # If more than one asset matches this name, raise an error
-        if len(rows) > 1:
-            err_msg = self.localized_resource_obj.get_error_msg(906)
-            err_msg = err_msg.format(repo_n=repo_n, asset_n=asset_n)
-            raise SquirrelError(err_msg, 906)
+        # # If more than one asset matches this name, raise an error
+        # if len(rows) > 1:
+        #     err_msg = self.localized_resource_obj.get_error_msg(906)
+        #     err_msg = err_msg.format(repo_n=repo_n, asset_n=asset_n)
+        #     raise SquirrelError(err_msg, 906)
 
         sql = self.sql_resources.get("disambiguate_uri", "get_uri_path_from_asset_n")
         rows = self.cursor.execute(sql, (repo_n, asset_n)).fetchall()
@@ -729,13 +732,34 @@ class Cache(object):
             err_msg = err_msg.format(asset_n=asset_n)
             raise SquirrelError(err_msg, 908)
 
-        # If more than one uri paths match this name
-        if len(rows) > 1:
-            err_msg = self.localized_resource_obj.get_error_msg(909)
-            err_msg = err_msg.format(asset_n=asset_n)
-            raise SquirrelError(err_msg, 909)
+        # # If more than one uri paths match this name
+        # if len(rows) > 1:
+        #     err_msg = self.localized_resource_obj.get_error_msg(909)
+        #     err_msg = err_msg.format(asset_n=asset_n)
+        #     raise SquirrelError(err_msg, 909)
 
-        return rows[0][0]
+        return rows[0][0]  # TODO: Check to make sure we don't want to just return rows
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def uris_from_asset_ids(self,
+                            asset_ids):
+        """
+        Given a list of asset id's, return a list of URI's that match these id's.
+
+        :param asset_ids:
+                A list of asset_id's.
+
+        :return:
+                A list of URI's.
+        """
+
+        assert type(asset_ids) is list
+
+        sql = self.sql_resources.get("disambiguate_uri", "uris_from_asset_ids")
+        sql = sql.format(range=",".join([str(i) for i in asset_ids]))
+        uris = self.cursor.execute(sql).fetchall()
+
+        return uris  # TODO: Check to make sure returning the whole uris list is what we want to do.
 
     # ------------------------------------------------------------------------------------------------------------------
     def uri_from_asset_path(self,

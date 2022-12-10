@@ -1920,6 +1920,28 @@ def uri_list_from_name_and_paths(repo_n,
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+def verify_multiple_uris(uris,
+                         title,
+                         max_count=100):
+    """
+    Lets the user know that there are multiple URI's returned, and checks to see if the action should continue.
+
+    :param uris:
+            The list of URI's returned.
+    :param title:
+            The title to display.
+    :param max_count:
+            The maximum number of URI's to display. Defaults to 100.
+
+    :return:
+            True if the subtask should be performed. False if not (the user chose to cancel).
+    """
+
+    # TODO: get the user's choice after telling them how many assets are selected.
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 def subtask_make_repo(args,
                       repo_manager_obj):
     """
@@ -2929,16 +2951,30 @@ def subtask_add_asset_notes(args,
 
     args.notes = " ".join(args.notes)
 
+    if type(args.uri) is str:
+        args.uri = [args.uri]
+
     try:
-        uri = repo_manager_obj.disambiguate_uri(uri=args.uri,
-                                                repo_required=False,
-                                                path_required=False,
-                                                name_required=True)
-        repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
-        repo_obj.add_asset_notes(notes=args.notes,
-                                 uri=uri,
-                                 overwrite=args.overwrite,
-                                 log_str=log_str)
+        # TODO: Factor this out into a separate function (based on required elements of the URI)
+        uris = list()
+        for partial_uri in args.uri:
+            uris.extend(repo_manager_obj.disambiguate_uri(uri=partial_uri,
+                                                          repo_required=False,
+                                                          path_required=False,
+                                                          name_required=False))
+        title = "You are about to add notes to the following assets."
+        if not verify_multiple_uris(uris=uris,
+                                    title=title,
+                                    max_count=100):
+            return
+
+        for uri in uris:
+            repo_obj = repo_manager_obj.repo_obj_from_uri(uri)
+            repo_obj.add_asset_notes(notes=args.notes,
+                                     uri=uri,
+                                     overwrite=args.overwrite,
+                                     log_str=log_str)
+
     except SquirrelError as e:
         print(f"({e.code}) {e.message}")
         sys.exit(e.code)
